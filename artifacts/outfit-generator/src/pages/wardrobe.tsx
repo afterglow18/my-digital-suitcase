@@ -162,14 +162,14 @@ export default function WardrobePage() {
       {/* ── Header ── */}
       <header className="px-4 mb-4">
         <h1 className="text-[2.5rem] font-display font-bold uppercase tracking-tighter leading-none">
-          My Digital
+          My Virtual
         </h1>
         <h1 className="text-[2.5rem] font-display font-bold uppercase tracking-tighter leading-none -mt-1">
           Closet
         </h1>
         <div className="flex items-center justify-between mt-1">
           <p className="text-muted-foreground font-medium text-sm">
-            Swipe each row · tap centred item for details.
+            Inspired by the iconic digital closets of the '90s.
           </p>
           {/* Free tier limit badge */}
           {isFree && totalItems > 0 && (

@@ -86,7 +86,7 @@ export function UpgradeSheet({ reason, onClose }: Props) {
             </div>
             <p className="text-sm font-medium text-black/70 leading-snug pt-1">
               {limitLabel}
-              {" "}Unlock forever to keep growing your digital closet.
+              {" "}Unlock forever to keep growing your virtual closet.
             </p>
           </div>
         </div>

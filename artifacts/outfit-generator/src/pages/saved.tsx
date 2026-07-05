@@ -289,7 +289,7 @@ export default function SavedPage() {
           </div>
           <h3 className="font-display font-bold text-xl mb-2">No looks saved.</h3>
           <p className="text-sm font-medium text-muted-foreground">
-            Go to your closet, pick pieces from each row, and save the combo.
+            Go to your virtual closet, pick pieces from each row, and save the combo.
           </p>
         </div>
       )}
