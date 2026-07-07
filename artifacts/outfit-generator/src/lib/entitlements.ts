@@ -10,7 +10,7 @@
 export type Tier = "free" | "unlock" | "premium";
 
 /** Adjust these constants to run promotions or A/B tests without touching logic. */
-export const FREE_ITEM_LIMIT   = 50;
+export const FREE_ITEM_LIMIT   = 20;
 export const FREE_OUTFIT_LIMIT = 5;
 
 export interface TierCapabilities {

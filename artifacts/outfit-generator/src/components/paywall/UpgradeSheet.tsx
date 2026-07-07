@@ -30,7 +30,7 @@ const FEATURES = [
 ] as const;
 
 const SUBTITLES: Record<UpgradeReason, string> = {
-  items:     "Your free closet is full!",
+  items:     "You've reached your 20-item limit. Unlock your entire digital closet with a one-time purchase of $4.99.",
   outfits:   "You've hit the free outfit limit.",
   mannequin: "A premium feature — unlock it once.",
 };

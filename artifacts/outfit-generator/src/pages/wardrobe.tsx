@@ -284,25 +284,30 @@ export default function WardrobePage() {
 
       {ready && (
         <>
-          {/* ── Item-limit warning badge (only when full) ── */}
-          {itemsLeft === 0 && (
+          {/* ── Item-limit counter badge (free users only) ── */}
+          {itemsLeft !== null && (
             <button
               onClick={() => setUpgradeReason("items")}
               data-testid="badge-item-count"
-              aria-label="Wardrobe full — tap to upgrade"
+              aria-label={`${totalItems} of ${FREE_ITEM_LIMIT} items used — tap to upgrade`}
               style={{
                 position: "absolute",
                 top: pY(ir, 0.255), left: "50%", transform: "translateX(-50%)",
                 zIndex: 12,
                 padding: "3px 14px", borderRadius: 20, border: "none",
-                background: "rgba(200,40,40,0.14)",
-                boxShadow: "0 0 0 2px rgba(200,40,40,0.40)",
-                color: "#aa0000", fontWeight: 700, fontSize: 11,
+                background: totalItems >= FREE_ITEM_LIMIT
+                  ? "rgba(200,40,40,0.14)"
+                  : "rgba(0,0,0,0.10)",
+                boxShadow: totalItems >= FREE_ITEM_LIMIT
+                  ? "0 0 0 2px rgba(200,40,40,0.40)"
+                  : "0 0 0 1.5px rgba(0,0,0,0.18)",
+                color: totalItems >= FREE_ITEM_LIMIT ? "#aa0000" : "#5a3a00",
+                fontWeight: 700, fontSize: 11,
                 letterSpacing: "0.08em", textTransform: "uppercase",
                 whiteSpace: "nowrap", cursor: "pointer",
               }}
             >
-              WARDROBE FULL
+              {totalItems}/{FREE_ITEM_LIMIT} ITEMS
             </button>
           )}
 
