@@ -416,7 +416,7 @@ export default function GeneratePage() {
                 position: "absolute",
                 top: "46%", left: "50%",
                 transform: "translate(-50%, -50%)",
-                zIndex: 15,
+                zIndex: 30,
                 textAlign: "center",
                 padding: "14px 22px",
                 borderRadius: 16,
