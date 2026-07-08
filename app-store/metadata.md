@@ -37,7 +37,7 @@ My Digital Closet is built to feel native on iPhone — smooth swipe carousels, 
 
 **FREE & PREMIUM**
 
-- Free: up to 50 wardrobe items and 5 saved outfits
+- Free: up to 20 wardrobe items and 5 saved outfits
 - My Digital Closet Premium: unlimited items, unlimited outfits — one-time purchase, no subscription
 
 ---
