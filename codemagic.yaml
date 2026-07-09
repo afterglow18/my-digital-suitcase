@@ -25,7 +25,7 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.mydigitalcloset.app
       xcode: latest
-      node: 20
+      node: 22
       groups:
         - signing
         - build_env
