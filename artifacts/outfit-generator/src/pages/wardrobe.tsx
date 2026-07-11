@@ -284,9 +284,9 @@ export default function WardrobePage() {
                   </div>
                 )}
 
-                {/* ── ADD button — shown when section is empty ─────────────
-                    Transparent tap zone when items present (covered by carousel),
-                    pink pill when empty (matches baked-in image pill below).     */}
+                {/* ── ADD button ──────────────────────────────────────────
+                    Empty section: transparent tap zone over the baked-in pill.
+                    Items present: small "+" pill visible in top-right of section. */}
                 {items.length === 0 ? (
                   <button
                     onClick={addHandlers[key]}
@@ -305,23 +305,34 @@ export default function WardrobePage() {
                     }}
                   />
                 ) : (
-                  /* Transparent tap zone over entire section when items exist */
                   <button
                     onClick={addHandlers[key]}
                     aria-label={btnLabel}
                     data-testid={`add-btn-${key}`}
                     style={{
                       position: "absolute",
-                      top:    secTop,
-                      left:   carLeft,
-                      width:  carW,
-                      height: secH,
-                      zIndex: 5, // below carousel (z=10) so carousel handles taps first
-                      background: "transparent",
-                      border: "none",
+                      top:    secTop + 6,
+                      right:  ir.width - (carLeft + carW) + 6,
+                      width:  28,
+                      height: 28,
+                      zIndex: 30,
+                      background: "rgba(255,145,176,0.92)",
+                      border: "2px solid #000",
+                      borderRadius: "50%",
                       cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 18,
+                      lineHeight: 1,
+                      color: "#000",
+                      fontWeight: 700,
+                      boxShadow: "2px 2px 0 #000",
+                      padding: 0,
                     }}
-                  />
+                  >
+                    +
+                  </button>
                 )}
 
               </React.Fragment>
