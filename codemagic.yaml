@@ -58,7 +58,7 @@ workflows:
         script: |
           ICONSET="artifacts/outfit-generator/ios/App/App/Assets.xcassets/AppIcon.appiconset"
           mkdir -p "$ICONSET"
-          cp app-store/AppIcon-1024.png "$ICONSET/AppIcon-1024.png"
+          sips -z 1024 1024 app-store/AppIcon-1024.png --out "$ICONSET/AppIcon-1024.png"
           cat > "$ICONSET/Contents.json" << 'EOF'
           {
             "images": [
