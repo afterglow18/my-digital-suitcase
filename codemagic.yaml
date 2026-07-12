@@ -94,22 +94,6 @@ workflows:
           cd artifacts/outfit-generator/ios/App
           agvtool new-version -all $BUILD_NUMBER
 
-      - name: Set up keychain
-        script: keychain initialize
-
-      - name: Fetch signing files
-        script: |
-          printf '%b' "$APP_STORE_CONNECT_PRIVATE_KEY" | sed 's/\\n/\n/g' > /tmp/auth_key.p8
-          chmod 600 /tmp/auth_key.p8
-          app-store-connect fetch-signing-files \
-            com.mydigitalvanity.app \
-            --type IOS_APP_STORE \
-            --certificate-key @file:/tmp/auth_key.p8 \
-            --create
-
-      - name: Add certificates to keychain
-        script: keychain add-certificates
-
       - name: Apply provisioning profiles
         script: |
           xcode-project use-profiles \
