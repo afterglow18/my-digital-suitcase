@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Codemagic CI/CD — My Digital Vanity iOS build
+# Codemagic CI/CD — My Digital Suitcase iOS build
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # REQUIRED — Codemagic → your app → Environment variables
@@ -20,7 +20,7 @@ workflows:
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.mydigitalvanity.app
+        bundle_identifier: com.mydigitalsuitcase.app
       xcode: latest
       node: 22
       groups:
@@ -31,9 +31,9 @@ workflows:
         XCODE_PROJECT: artifacts/outfit-generator/ios/App/App.xcodeproj
         XCODE_WORKSPACE: artifacts/outfit-generator/ios/App/App.xcodeproj/project.xcworkspace
         COREPACK_ENABLE_STRICT: "0"
-        BUNDLE_ID: com.mydigitalvanity.app
+        BUNDLE_ID: com.mydigitalsuitcase.app
         TEAM_ID: 2A78MFVCJS
-        PROFILE_NAME: My Digital Vanity App
+        PROFILE_NAME: My Digital Suitcase App
 
     scripts:
       - name: Install pnpm and dependencies
