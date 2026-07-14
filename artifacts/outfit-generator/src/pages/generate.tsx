@@ -29,13 +29,13 @@ const NAV_H = 90;
 const PINK  = "#E8D4B0";
 
 const LM = {
-  doorL: 0.207,
-  doorR: 0.801,
+  doorL: 0.07,
+  doorR: 0.93,
   rows: [
-    { sectionTop: 0.241, shelfY: 0.344, btnCY: 0.220 },  // MAKEUP
-    { sectionTop: 0.390, shelfY: 0.502, btnCY: 0.367 },  // SKINCARE
-    { sectionTop: 0.547, shelfY: 0.663, btnCY: 0.525 },  // HAIR
-    { sectionTop: 0.702, shelfY: 0.805, btnCY: 0.683 },  // FRAGRANCES
+    { sectionTop: 0.130, shelfY: 0.225, btnCY: 0.110 },  // OUTFITS  (lid, upper)
+    { sectionTop: 0.265, shelfY: 0.360, btnCY: 0.245 },  // BEAUTY   (lid, lower)
+    { sectionTop: 0.465, shelfY: 0.578, btnCY: 0.445 },  // TOILETRIES (body, upper)
+    { sectionTop: 0.620, shelfY: 0.730, btnCY: 0.600 },  // ESSENTIALS (body, lower)
   ],
   // Action bar: from just below FRAGRANCES through the full bottom
   barY:   0.848,
@@ -271,7 +271,7 @@ export default function GeneratePage() {
             {/* ── Page title ── */}
             <div style={{
               position: "absolute",
-              top: pY(ir, 0.138),
+              top: pY(ir, 0.058),
               left: pX(ir, LM.doorL),
               width: pW(ir, LM.doorR - LM.doorL),
               zIndex: 25,
