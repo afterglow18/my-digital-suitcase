@@ -550,7 +550,7 @@ export default function GeneratePage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 8 }}
                     style={{
-                      display: "flex", gap: 10, justifyContent: "center",
+                      display: "flex", gap: 18, justifyContent: "center",
                       width: "100%",
                     }}
                   >
@@ -558,7 +558,7 @@ export default function GeneratePage() {
                       onClick={handleRespin}
                       style={{
                         flexGrow: 1, flexShrink: 1, flexBasis: "0%", minWidth: 0,
-                        height: 44, borderRadius: 24,
+                        height: 54, borderRadius: 28,
                         border: "2.5px solid #B8894E",
                         background: "linear-gradient(to bottom, #E8D4B0, #B8894E)",
                         color: "#4A3A3A",
@@ -582,8 +582,7 @@ export default function GeneratePage() {
                       disabled={!canSave}
                       style={{
                         flexGrow: 1, flexShrink: 1, flexBasis: "0%", minWidth: 0,
-                        marginLeft: -10,
-                        height: 44, borderRadius: 24,
+                        height: 54, borderRadius: 28,
                         border: "2.5px solid #B8894E",
                         background: canSave ? "#fff" : "rgba(240,240,240,0.80)",
                         color: "#3A2210",
