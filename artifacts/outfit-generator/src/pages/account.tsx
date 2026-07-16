@@ -6,7 +6,7 @@
  *   2. BACKUP & RESTORE — export/import with warning text
  *   3. MY DIGITAL SUITCASE — app version + tagline
  */
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Download, Upload, RefreshCw, Loader2, Check, AlertTriangle, ShieldCheck } from "lucide-react";
 import { exportBackup, importBackup, pickBackupFile } from "@/lib/backup";
@@ -91,14 +91,9 @@ export default function AccountPage() {
 
   const { isLockEnabled, setLockEnabled } = useBiometricLock();
   const [lockPending, setLockPending] = useState(false);
-  // Loaded lazily here — not at app root — so canEvaluatePolicy (which triggers
-  // the iOS Face ID permission dialog) only fires when the user opens Settings.
-  const [biometryType, setBiometryType] = useState<import("@/lib/biometric").BiometryType>("none");
-  useEffect(() => {
-    import("@/lib/biometric").then(({ checkBiometryAvailable }) =>
-      checkBiometryAvailable().then(setBiometryType),
-    );
-  }, []);
+  // Show the toggle on any native platform — no biometry check on mount.
+  // The actual Face ID / Touch ID dialog only fires when the user taps the toggle.
+  const showBiometricToggle = Capacitor.isNativePlatform();
 
   const handleLockToggle = async () => {
     setLockPending(true);
@@ -257,18 +252,17 @@ export default function AccountPage() {
         </Card>
 
         {/* ── 2. PRIVACY & SECURITY ───────────────────────────────────────── */}
-        {biometryType !== "none" && (
+        {showBiometricToggle && (
           <Card emoji="🔒" title="Privacy & Security">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 min-w-0">
                 <ShieldCheck className="w-5 h-5 shrink-0 text-black/60" />
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-black leading-tight">
-                    Lock with {biometryType === "face" ? "Face ID" : "Touch ID"}
+                    Lock with Face ID / Touch ID
                   </p>
                   <p className="text-xs text-black/45 leading-snug mt-0.5">
-                    Require {biometryType === "face" ? "Face ID" : "Touch ID"} when
-                    opening the app or returning from background.
+                    Require biometrics when opening the app or returning from background.
                   </p>
                 </div>
               </div>
