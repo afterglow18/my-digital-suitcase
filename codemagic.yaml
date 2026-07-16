@@ -99,6 +99,9 @@ workflows:
           # Declare no non-exempt encryption so TestFlight never asks
           /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" App/Info.plist 2>/dev/null || \
           /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" App/Info.plist
+          # Required for Face ID usage
+          /usr/libexec/PlistBuddy -c "Add :NSFaceIDUsageDescription string 'My Suitcase uses Face ID to protect your wardrobe.'" App/Info.plist 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :NSFaceIDUsageDescription 'My Suitcase uses Face ID to protect your wardrobe.'" App/Info.plist
 
       - name: Re-apply provisioning profiles after cap sync
         script: |
