@@ -135,9 +135,12 @@ function TierCard({
 // ── Sheet ─────────────────────────────────────────────────────────────────────
 
 export function UpgradeSheet({ reason, onClose }: Props) {
-  const { offerings, purchase, restore } = useSubscription();
+  const { offerings, isLoading, purchase, restore } = useSubscription();
   const [selected, setSelected] = useState<TierId>("lifetime");
   const [status,   setStatus]   = useState<"idle" | "pending" | "restoring">("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const offersReady = !isLoading && offerings !== null;
 
   const prices: Record<TierId, string> = {
     monthly:  getLivePrice(offerings, "$rc_monthly",  "$1.99"),
@@ -146,34 +149,47 @@ export function UpgradeSheet({ reason, onClose }: Props) {
   };
 
   const ctaLabel =
-    status === "pending"        ? "Opening…"
-    : selected === "lifetime"   ? `UNLOCK FOREVER – ${prices.lifetime} ›`
-    : selected === "yearly"     ? `SUBSCRIBE – ${prices.yearly}/YR ›`
-    :                             `SUBSCRIBE – ${prices.monthly}/MO ›`;
+    isLoading              ? "Loading…"
+    : status === "pending" ? "Opening…"
+    : selected === "lifetime" ? `UNLOCK FOREVER – ${prices.lifetime} ›`
+    : selected === "yearly"   ? `SUBSCRIBE – ${prices.yearly}/YR ›`
+    :                           `SUBSCRIBE – ${prices.monthly}/MO ›`;
 
   const handlePurchase = useCallback(async () => {
     if (status !== "idle") return;
+    setErrorMsg(null);
     setStatus("pending");
+
     const pkg = getRcPackage(offerings, TIER_DEFAULTS[selected].pkgId);
-    if (!pkg) { setStatus("idle"); return; }
+    if (!pkg) {
+      setStatus("idle");
+      setErrorMsg("Products not available. Please check your connection and try again.");
+      return;
+    }
+
     try {
       await purchase(pkg);
       onClose();
     } catch (err: unknown) {
       setStatus("idle");
       const msg = err instanceof Error ? err.message.toLowerCase() : "";
-      if (!msg.includes("cancel") && !msg.includes("dismiss")) console.error("Purchase error:", err);
+      // User-cancelled — don't show an error
+      if (msg.includes("cancel") || msg.includes("dismiss") || msg.includes("user cancel")) return;
+      setErrorMsg("Purchase could not be completed. Please try again.");
+      console.error("Purchase error:", err);
     }
   }, [status, offerings, selected, purchase, onClose]);
 
   const handleRestore = useCallback(async () => {
     if (status !== "idle") return;
+    setErrorMsg(null);
     setStatus("restoring");
     try {
       await restore();
       onClose();
     } catch {
       setStatus("idle");
+      setErrorMsg("Could not restore purchases. Please try again.");
     }
   }, [status, restore, onClose]);
 
@@ -262,16 +278,23 @@ export function UpgradeSheet({ reason, onClose }: Props) {
         className="px-5 pt-2 flex flex-col gap-2 flex-shrink-0"
         style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
       >
+        {/* Error message */}
+        {errorMsg && (
+          <p className="text-center text-[11px] font-semibold text-red-600 leading-snug px-1">
+            {errorMsg}
+          </p>
+        )}
+
         {/* Main purchase button */}
         <button
           onClick={handlePurchase}
-          disabled={status !== "idle"}
+          disabled={status !== "idle" || !offersReady}
           className="w-full py-3.5 rounded-2xl font-display font-bold text-lg uppercase
                      tracking-tight border-[3px] border-black text-black
                      active:translate-x-0.5 active:translate-y-0.5 transition-all
                      disabled:opacity-60 disabled:cursor-not-allowed bg-primary"
           style={{
-            boxShadow: status !== "idle" ? "none" : "4px 4px 0px 0px rgba(0,0,0,1)",
+            boxShadow: (status !== "idle" || !offersReady) ? "none" : "4px 4px 0px 0px rgba(0,0,0,1)",
           }}
         >
           {ctaLabel}
