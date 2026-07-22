@@ -102,6 +102,15 @@ workflows:
           # Required for Face ID usage
           /usr/libexec/PlistBuddy -c "Add :NSFaceIDUsageDescription string 'My Suitcase uses Face ID to protect your wardrobe.'" App/Info.plist 2>/dev/null || \
           /usr/libexec/PlistBuddy -c "Set :NSFaceIDUsageDescription 'My Suitcase uses Face ID to protect your wardrobe.'" App/Info.plist
+          # Required to access the camera
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'My Suitcase uses the camera so you can photograph clothing items for your wardrobe.'" App/Info.plist 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 'My Suitcase uses the camera so you can photograph clothing items for your wardrobe.'" App/Info.plist
+          # Required to read photos from the library
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'My Suitcase reads your photo library so you can add existing photos to your wardrobe.'" App/Info.plist 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :NSPhotoLibraryUsageDescription 'My Suitcase reads your photo library so you can add existing photos to your wardrobe.'" App/Info.plist
+          # Required when camera capture saves a photo back to the library
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 'My Suitcase saves captured photos to your library for easy access later.'" App/Info.plist 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :NSPhotoLibraryAddUsageDescription 'My Suitcase saves captured photos to your library for easy access later.'" App/Info.plist
 
       - name: Re-apply provisioning profiles after cap sync
         script: |
