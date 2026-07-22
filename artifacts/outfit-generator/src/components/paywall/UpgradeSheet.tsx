@@ -12,7 +12,20 @@
 import React, { useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { X, Check } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
 import { useSubscription } from "@/lib/revenuecat";
+
+const PRIVACY_URL = "https://app.notion.com/p/My-Digital-Collection-Privacy-Policy-39682db6065380b19dedcb108d4a0ef4?source=copy_link";
+const TERMS_URL   = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
+
+async function openUrl(url: string) {
+  if (Capacitor.isNativePlatform()) {
+    const { Browser } = await import("@capacitor/browser");
+    await Browser.open({ url });
+  } else {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
 
 export type UpgradeReason = "items" | "outfits" | "mannequin";
 type TierId = "monthly" | "yearly" | "lifetime";
@@ -122,9 +135,9 @@ function TierCard({
 // ── Sheet ─────────────────────────────────────────────────────────────────────
 
 export function UpgradeSheet({ reason, onClose }: Props) {
-  const { offerings, purchase } = useSubscription();
+  const { offerings, purchase, restore } = useSubscription();
   const [selected, setSelected] = useState<TierId>("lifetime");
-  const [status,   setStatus]   = useState<"idle" | "pending">("idle");
+  const [status,   setStatus]   = useState<"idle" | "pending" | "restoring">("idle");
 
   const prices: Record<TierId, string> = {
     monthly:  getLivePrice(offerings, "$rc_monthly",  "$1.99"),
@@ -139,7 +152,7 @@ export function UpgradeSheet({ reason, onClose }: Props) {
     :                             `SUBSCRIBE – ${prices.monthly}/MO ›`;
 
   const handlePurchase = useCallback(async () => {
-    if (status === "pending") return;
+    if (status !== "idle") return;
     setStatus("pending");
     const pkg = getRcPackage(offerings, TIER_DEFAULTS[selected].pkgId);
     if (!pkg) { setStatus("idle"); return; }
@@ -152,6 +165,17 @@ export function UpgradeSheet({ reason, onClose }: Props) {
       if (!msg.includes("cancel") && !msg.includes("dismiss")) console.error("Purchase error:", err);
     }
   }, [status, offerings, selected, purchase, onClose]);
+
+  const handleRestore = useCallback(async () => {
+    if (status !== "idle") return;
+    setStatus("restoring");
+    try {
+      await restore();
+      onClose();
+    } catch {
+      setStatus("idle");
+    }
+  }, [status, restore, onClose]);
 
   return (
     <motion.div
@@ -236,27 +260,56 @@ export function UpgradeSheet({ reason, onClose }: Props) {
       {/* CTA footer */}
       <div
         className="px-5 pt-2 flex flex-col gap-2 flex-shrink-0"
-        style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+        style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
       >
+        {/* Main purchase button */}
         <button
           onClick={handlePurchase}
-          disabled={status === "pending"}
+          disabled={status !== "idle"}
           className="w-full py-3.5 rounded-2xl font-display font-bold text-lg uppercase
                      tracking-tight border-[3px] border-black text-black
                      active:translate-x-0.5 active:translate-y-0.5 transition-all
                      disabled:opacity-60 disabled:cursor-not-allowed bg-primary"
           style={{
-            boxShadow: status === "pending" ? "none" : "4px 4px 0px 0px rgba(0,0,0,1)",
+            boxShadow: status !== "idle" ? "none" : "4px 4px 0px 0px rgba(0,0,0,1)",
           }}
         >
           {ctaLabel}
         </button>
-        <button
-          onClick={onClose}
-          className="text-sm font-semibold text-black/35 text-center hover:text-black/55 transition-colors"
-        >
-          Maybe Later
-        </button>
+
+        {/* Maybe Later + Restore row */}
+        <div className="flex items-center justify-between px-1">
+          <button
+            onClick={onClose}
+            className="text-sm font-semibold text-black/35 hover:text-black/55 transition-colors"
+          >
+            Maybe Later
+          </button>
+          <button
+            onClick={handleRestore}
+            disabled={status !== "idle"}
+            className="text-sm font-semibold text-black/35 hover:text-black/55 transition-colors disabled:opacity-40"
+          >
+            {status === "restoring" ? "Restoring…" : "Restore Purchases"}
+          </button>
+        </div>
+
+        {/* Legal links — required by Apple */}
+        <div className="flex items-center justify-center gap-3 pb-0.5">
+          <button
+            onClick={() => openUrl(PRIVACY_URL)}
+            className="text-[10px] font-medium text-black/30 underline underline-offset-2 hover:text-black/50 transition-colors"
+          >
+            Privacy Policy
+          </button>
+          <span className="text-[10px] text-black/20">·</span>
+          <button
+            onClick={() => openUrl(TERMS_URL)}
+            className="text-[10px] font-medium text-black/30 underline underline-offset-2 hover:text-black/50 transition-colors"
+          >
+            Terms of Use
+          </button>
+        </div>
       </div>
     </motion.div>
   );
