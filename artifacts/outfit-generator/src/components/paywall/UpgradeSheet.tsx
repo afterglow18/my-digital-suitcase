@@ -212,12 +212,10 @@ export function UpgradeSheet({ reason, onClose }: Props) {
       onClose();
     } catch (err: unknown) {
       setStatus("idle");
-      // Always log — including user-cancels — so Xcode console shows the real reason
-      console.error("[Purchase] error:", err);
-      const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
-      // User deliberately cancelled — don't show an error in the UI
-      if (msg.includes("cancel") || msg.includes("usercancel") || msg.includes("paymentcancelled")) return;
-      setErrorMsg("Purchase could not be completed. Please try again.");
+      // Show the raw error on screen so we can diagnose — including cancels
+      const rawMsg = err instanceof Error ? err.message : String(err);
+      console.error("[Purchase] error:", rawMsg);
+      setErrorMsg("Error: " + rawMsg);
     }
   }, [status, offerings, selected, purchase, onClose]);
 
