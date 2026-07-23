@@ -76,9 +76,23 @@ const CUSTOMER_INFO_KEY = ["revenuecat", "customer-info"] as const;
 
 function useSubscriptionContext() {
   const qc = useQueryClient();
+  const [rcReady, setRcReady] = React.useState(false);
 
-  // staleTime: 0 — always considered stale so every mount/focus triggers a
-  // fresh fetch. The foreground listener below handles mid-session refreshes.
+  // Initialize RC inside the provider so queries are gated behind it.
+  // This replaces the fire-and-forget call in App.tsx and guarantees
+  // configure() is complete before either query fires.
+  useEffect(() => {
+    let cancelled = false;
+    initializeRevenueCat()
+      .then(() => { if (!cancelled) setRcReady(true); })
+      .catch((err) => {
+        console.warn("[RevenueCat] Init failed:", err);
+        // Still set ready so the UI doesn't hang — purchases will fail gracefully
+        if (!cancelled) setRcReady(true);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   const customerInfoQuery = useQuery({
     queryKey: CUSTOMER_INFO_KEY,
     queryFn: async () => {
@@ -87,8 +101,9 @@ function useSubscriptionContext() {
       const { customerInfo } = await Purchases.getCustomerInfo();
       return customerInfo;
     },
+    enabled: rcReady,
     staleTime: 0,
-    retry: false,
+    retry: 2,
   });
 
   const offeringsQuery = useQuery({
@@ -98,10 +113,11 @@ function useSubscriptionContext() {
       if (!Purchases) return null;
       const result = await Purchases.getOfferings();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (result as any).offerings ?? result ?? null;
+      return (result as any).current != null ? result : (result as any).offerings ?? null;
     },
+    enabled: rcReady,
     staleTime: 300 * 1000,
-    retry: false,
+    retry: 3,
   });
 
   // ── Foreground + server-push listeners ─────────────────────────────────────
