@@ -77,14 +77,28 @@ const TIER_ORDER: TierId[] = ["monthly", "yearly", "lifetime"];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getRcPackage(offerings: any, pkgId: string): any | undefined {
-  // 1. Try exact identifier match
-  const byId = offerings?.current?.availablePackages?.find(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (p: any) => p.identifier === pkgId,
-  );
+  const packages: any[] = offerings?.current?.availablePackages ?? [];
+
+  // 1. Exact identifier match  e.g. "$rc_monthly"
+  const byId = packages.find((p: any) => p.identifier === pkgId);
   if (byId) return byId;
 
-  // 2. Fall back to convenience properties in case packages have custom identifiers
+  // 2. packageType enum match  e.g. "MONTHLY" / "ANNUAL" / "LIFETIME"
+  //    The RC SDK stores the type as an enum string, NOT the identifier string.
+  //    This is the most common mismatch — same fix that unblocked the other app.
+  const packageTypeMap: Record<string, string> = {
+    "$rc_monthly":  "MONTHLY",
+    "$rc_annual":   "ANNUAL",
+    "$rc_lifetime": "LIFETIME",
+    "$rc_weekly":   "WEEKLY",
+  };
+  const pkgType = packageTypeMap[pkgId];
+  if (pkgType) {
+    const byType = packages.find((p: any) => p.packageType === pkgType);
+    if (byType) return byType;
+  }
+
+  // 3. Convenience property fallback  e.g. offering.monthly
   const convenienceKey: Record<string, string> = {
     "$rc_monthly":  "monthly",
     "$rc_annual":   "annual",
