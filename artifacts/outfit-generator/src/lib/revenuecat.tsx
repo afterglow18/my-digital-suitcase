@@ -24,11 +24,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const REVENUECAT_ENTITLEMENT_IDENTIFIER = "premium";
 
-const RC_IOS_KEY = import.meta.env.VITE_REVENUECAT_IOS_API_KEY as string | undefined;
+const RC_IOS_KEY = import.meta.env.VITE_REVENUECAT_IOS_KEY as string | undefined;
 
 function getApiKey(): string {
   if (RC_IOS_KEY) return RC_IOS_KEY;
-  throw new Error("RevenueCat API key not configured — set VITE_REVENUECAT_IOS_API_KEY");
+  throw new Error("RevenueCat API key not configured — set VITE_REVENUECAT_IOS_KEY");
 }
 
 // ── Lazy-import Purchases so it doesn't crash in the browser ─────────────────

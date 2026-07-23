@@ -200,7 +200,7 @@ export function UpgradeSheet({ reason, onClose }: Props) {
       setStatus("idle");
       const { Capacitor } = await import("@capacitor/core");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rcKey = (import.meta.env as any).VITE_REVENUECAT_IOS_API_KEY;
+      const rcKey = (import.meta.env as any).VITE_REVENUECAT_IOS_KEY;
       const diagMsg =
         `Platform: ${Capacitor.getPlatform()} | Native: ${Capacitor.isNativePlatform()}\n` +
         `RC Key: ${rcKey ? `set (${String(rcKey).length} chars)` : "MISSING ❌"}\n` +
