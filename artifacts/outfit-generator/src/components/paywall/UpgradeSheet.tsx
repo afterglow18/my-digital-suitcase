@@ -174,23 +174,36 @@ export function UpgradeSheet({ reason, onClose }: Props) {
     setErrorMsg(null);
     setStatus("pending");
 
+    console.log("[Purchase] tap — offerings:", JSON.stringify({
+      hasCurrent: !!(offerings as any)?.current,
+      pkgId: TIER_DEFAULTS[selected].pkgId,
+    }));
+
     const pkg = getRcPackage(offerings, TIER_DEFAULTS[selected].pkgId);
+    console.log("[Purchase] resolved pkg:", pkg ? (pkg as any).identifier : "null");
+
     if (!pkg) {
       setStatus("idle");
-      setErrorMsg("Products not available. Please check your connection and try again.");
+      const msg = "Products not available. Please check your connection and try again.";
+      setErrorMsg(msg);
+      // Also alert so it's impossible to miss during testing
+      if (typeof window !== "undefined" && window.alert) window.alert("[RC] " + msg);
       return;
     }
 
     try {
+      console.log("[Purchase] calling purchasePackage…");
       await purchase(pkg);
+      console.log("[Purchase] success");
       onClose();
     } catch (err: unknown) {
       setStatus("idle");
-      const msg = err instanceof Error ? err.message.toLowerCase() : "";
-      // User-cancelled — don't show an error
-      if (msg.includes("cancel") || msg.includes("dismiss") || msg.includes("user cancel")) return;
+      // Always log — including user-cancels — so Xcode console shows the real reason
+      console.error("[Purchase] error:", err);
+      const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+      // User deliberately cancelled — don't show an error in the UI
+      if (msg.includes("cancel") || msg.includes("usercancel") || msg.includes("paymentcancelled")) return;
       setErrorMsg("Purchase could not be completed. Please try again.");
-      console.error("Purchase error:", err);
     }
   }, [status, offerings, selected, purchase, onClose]);
 
