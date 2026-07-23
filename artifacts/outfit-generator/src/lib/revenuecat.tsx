@@ -130,33 +130,31 @@ function useSubscriptionContext() {
       // Log the complete raw result so we can see exactly what RC + StoreKit returned.
       console.log("[RevenueCat] getOfferings() full result:", JSON.stringify(result));
 
-      // RC Capacitor returns PurchasesOfferings: { current, all }.
-      // Use current directly; fall back to all["default"] if current is null.
-      const current = result?.current ?? result?.all?.["default"] ?? null;
+      // Use offerings.current directly; fall back to offerings.all["default"].
+      const offering = result?.current ?? result?.all?.["default"] ?? null;
 
-      if (!current) {
-        console.warn("[RevenueCat] No current offering. all keys:", Object.keys(result?.all ?? {}));
+      if (!offering) {
+        console.warn("[RevenueCat] No offering found. all keys:", Object.keys(result?.all ?? {}));
         return result ?? null;
       }
 
-      console.log("[RevenueCat] Offering identifier:", current.identifier);
+      console.log("[RevenueCat] Offering:", offering.identifier);
 
-      // Log each package — missing product.priceString means StoreKit didn't return the product.
+      // Log each package — missing priceString means StoreKit withheld the product.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (current.availablePackages ?? []).forEach((pkg: any) => {
+      (offering.availablePackages ?? []).forEach((pkg: any) => {
         const p = pkg.product;
         if (!p?.priceString) {
-          console.warn("[RevenueCat] StoreKit product MISSING for package:", pkg.identifier,
-            "productId:", p?.productIdentifier ?? p?.identifier ?? "n/a");
+          console.warn("[RevenueCat] StoreKit product MISSING:", pkg.identifier,
+            p?.productIdentifier ?? p?.identifier ?? "n/a");
         } else {
-          console.log("[RevenueCat] Package OK:", pkg.identifier,
-            pkg.packageType, p.priceString,
-            "productId:", p.productIdentifier ?? p.identifier);
+          console.log("[RevenueCat] Package OK:", pkg.identifier, p.priceString);
         }
       });
 
-      // Ensure .current is set to the resolved offering before returning.
-      return current === result?.current ? result : { ...result, current };
+      // Return the raw result — .current is already set if RC had a current offering,
+      // otherwise patch it in from all["default"] so callers can use result.current uniformly.
+      return result?.current != null ? result : { ...result, current: offering };
     },
     enabled: rcReady,
     staleTime: 300 * 1000,
