@@ -112,15 +112,21 @@ function useSubscriptionContext() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const r = result as any;
       const resolved = r.current != null ? r : r.offerings ?? null;
+      // Prefer the "default" offering by identifier; fall back to current
+      const offering =
+        resolved?.all?.["default"] ?? resolved?.current ?? null;
       console.log("[RevenueCat] getOfferings raw:", JSON.stringify({
         hasCurrent: !!resolved?.current,
-        currentIdentifier: resolved?.current?.identifier,
-        packages: resolved?.current?.availablePackages?.map((p: any) => ({
+        hasDefault: !!resolved?.all?.["default"],
+        offeringIdentifier: offering?.identifier,
+        packages: offering?.availablePackages?.map((p: any) => ({
           id: p.identifier,
+          type: p.packageType,
           productId: p.product?.productIdentifier ?? p.product?.identifier,
         })),
       }));
-      return resolved;
+      // Return a synthetic PurchasesOfferings with .current pointing at the default offering
+      return offering ? { ...resolved, current: offering } : resolved;
     },
     enabled: rcReady,
     staleTime: 300 * 1000,
