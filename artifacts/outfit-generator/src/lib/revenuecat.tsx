@@ -24,11 +24,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const REVENUECAT_ENTITLEMENT_IDENTIFIER = "premium";
 
-const RC_IOS_KEY = import.meta.env.VITE_REVENUECAT_IOS_KEY as string | undefined;
+const RC_IOS_KEY = import.meta.env.VITE_REVENUECAT_IOS_API_KEY as string | undefined;
 
 function getApiKey(): string {
   if (RC_IOS_KEY) return RC_IOS_KEY;
-  throw new Error("RevenueCat API key not configured — set VITE_REVENUECAT_IOS_KEY");
+  throw new Error("RevenueCat API key not configured — set VITE_REVENUECAT_IOS_API_KEY");
 }
 
 // ── Lazy-import Purchases so it doesn't crash in the browser ─────────────────
@@ -79,9 +79,12 @@ const CUSTOMER_INFO_KEY = ["revenuecat", "customer-info"] as const;
 
 // ── Subscription context ──────────────────────────────────────────────────────
 
+const GRACE_MS = 2 * 60 * 1000; // 2 minutes
+
 function useSubscriptionContext() {
   const qc = useQueryClient();
   const [rcReady, setRcReady] = React.useState(false);
+  const [purchasedAt, setPurchasedAt] = React.useState<number | null>(null);
 
   // Initialize RC inside the provider so queries are gated behind it.
   // A 6-second timeout forces rcReady=true if configure() hangs on the native bridge.
@@ -206,6 +209,8 @@ function useSubscriptionContext() {
       return customerInfo;
     },
     onSuccess: (customerInfo) => {
+      // Mark purchase time for grace window — entitlement propagation can lag.
+      setPurchasedAt(Date.now());
       // Seed the cache immediately with the fresh CustomerInfo RC just returned,
       // then invalidate to schedule a background re-fetch for confirmation.
       qc.setQueryData(CUSTOMER_INFO_KEY, customerInfo);
@@ -228,10 +233,13 @@ function useSubscriptionContext() {
     },
   });
 
-  // ── Entitlement check — derived purely from live RC data ───────────────────
-  // Never reads localStorage. If customerInfo is null (not yet loaded or
-  // browser), isSubscribed is false — safe default to free tier.
+  // ── Entitlement check ──────────────────────────────────────────────────────
+  // If purchasePackage() completed without throwing, Apple accepted payment.
+  // Trust that immediately for 2 minutes — don't wait for RC entitlement
+  // propagation, which can lag and wrongly downgrade the user.
+  const inGrace = purchasedAt !== null && Date.now() - purchasedAt < GRACE_MS;
   const isSubscribed =
+    inGrace ||
     customerInfoQuery.data?.entitlements?.active?.[REVENUECAT_ENTITLEMENT_IDENTIFIER] !== undefined;
 
   return {

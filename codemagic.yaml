@@ -45,7 +45,7 @@ workflows:
       - name: Build web assets
         script: |
           cd artifacts/outfit-generator
-          VITE_REVENUECAT_IOS_KEY=$VITE_REVENUECAT_IOS_KEY \
+          VITE_REVENUECAT_IOS_API_KEY=$VITE_REVENUECAT_IOS_API_KEY \
           pnpm vite build --config vite.capacitor.config.ts
 
       - name: Capacitor add iOS and sync
