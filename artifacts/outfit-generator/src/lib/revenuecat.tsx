@@ -110,7 +110,17 @@ function useSubscriptionContext() {
       if (!Purchases) return null;
       const result = await Purchases.getOfferings();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (result as any).current != null ? result : (result as any).offerings ?? null;
+      const r = result as any;
+      const resolved = r.current != null ? r : r.offerings ?? null;
+      console.log("[RevenueCat] getOfferings raw:", JSON.stringify({
+        hasCurrent: !!resolved?.current,
+        currentIdentifier: resolved?.current?.identifier,
+        packages: resolved?.current?.availablePackages?.map((p: any) => ({
+          id: p.identifier,
+          productId: p.product?.productIdentifier ?? p.product?.identifier,
+        })),
+      }));
+      return resolved;
     },
     enabled: rcReady,
     staleTime: 300 * 1000,

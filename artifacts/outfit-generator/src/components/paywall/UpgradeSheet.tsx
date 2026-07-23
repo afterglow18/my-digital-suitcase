@@ -77,10 +77,24 @@ const TIER_ORDER: TierId[] = ["monthly", "yearly", "lifetime"];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getRcPackage(offerings: any, pkgId: string): any | undefined {
-  return offerings?.current?.availablePackages?.find(
+  // 1. Try exact identifier match
+  const byId = offerings?.current?.availablePackages?.find(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (p: any) => p.identifier === pkgId,
   );
+  if (byId) return byId;
+
+  // 2. Fall back to convenience properties in case packages have custom identifiers
+  const convenienceKey: Record<string, string> = {
+    "$rc_monthly":  "monthly",
+    "$rc_annual":   "annual",
+    "$rc_lifetime": "lifetime",
+    "$rc_weekly":   "weekly",
+  };
+  const key = convenienceKey[pkgId];
+  if (key && offerings?.current?.[key]) return offerings.current[key];
+
+  return undefined;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
