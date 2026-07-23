@@ -220,15 +220,16 @@ function useSubscriptionContext() {
     customerInfoQuery.data?.entitlements?.active?.[REVENUECAT_ENTITLEMENT_IDENTIFIER] !== undefined;
 
   return {
-    customerInfo:  customerInfoQuery.data ?? null,
-    offerings:     offeringsQuery.data ?? null,
+    customerInfo:   customerInfoQuery.data ?? null,
+    offerings:      offeringsQuery.data ?? null,
+    offeringsError: offeringsQuery.error as Error | null,
     isSubscribed,
-    isLoading:     customerInfoQuery.isLoading || offeringsQuery.isLoading,
-    purchase:      purchaseMutation.mutateAsync,
-    restore:       restoreMutation.mutateAsync,
-    isPurchasing:  purchaseMutation.isPending,
-    isRestoring:   restoreMutation.isPending,
-    purchaseError: purchaseMutation.error as Error | null,
+    isLoading:      customerInfoQuery.isLoading || offeringsQuery.isLoading,
+    purchase:       purchaseMutation.mutateAsync,
+    restore:        restoreMutation.mutateAsync,
+    isPurchasing:   purchaseMutation.isPending,
+    isRestoring:    restoreMutation.isPending,
+    purchaseError:  purchaseMutation.error as Error | null,
   };
 }
 
