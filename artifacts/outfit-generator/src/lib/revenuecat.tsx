@@ -50,27 +50,22 @@ async function getPurchases(): Promise<PurchasesType | null> {
 
 // ── Initialization ────────────────────────────────────────────────────────────
 
-/** Resolves after `ms` milliseconds — used to race against hanging native calls. */
-function timeout(ms: number): Promise<never> {
-  return new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`Timed out after ${ms}ms`)), ms)
-  );
-}
-
 export async function initializeRevenueCat(): Promise<void> {
   const Purchases = await getPurchases();
   if (!Purchases) return;
 
   const apiKey = getApiKey();
 
-  // Race configure() against a 5-second timeout so a hanging native bridge
-  // doesn't block rcReady forever.  setLogLevel() is intentionally omitted —
-  // it can stall the bridge on some builds.
-  await Promise.race([
-    Purchases.configure({ apiKey }),
-    timeout(5000),
-  ]);
-  console.log("[RevenueCat] Configured");
+  // configure() returns a Promise<void> but on iOS its native bridge call
+  // never resolves the JS promise — it fires and configures synchronously
+  // on the native side.  Do NOT await it; just call it and give the native
+  // side ~2 s to finish before callers proceed.
+  // setLogLevel() is intentionally omitted — it can stall the bridge.
+  Purchases.configure({ apiKey });
+  console.log("[RevenueCat] configure() called (fire-and-forget)");
+
+  await new Promise<void>((resolve) => setTimeout(resolve, 2000));
+  console.log("[RevenueCat] Ready (2 s settle wait complete)");
 }
 
 // ── Query key ─────────────────────────────────────────────────────────────────
@@ -84,25 +79,18 @@ function useSubscriptionContext() {
   const [rcReady, setRcReady] = React.useState(false);
 
   // Initialize RC inside the provider so queries are gated behind it.
-  // A 6-second timeout forces rcReady=true if configure() hangs on the native bridge.
+  // initializeRevenueCat() fires configure() without awaiting (the iOS native
+  // bridge call never resolves the JS promise) then waits a fixed 2 s settle
+  // period, so this always resolves in ~2 s.
   useEffect(() => {
     let cancelled = false;
-    const setReady = () => { if (!cancelled) setRcReady(true); };
-
-    // Fallback: if init hangs, unblock the queries after 6 s so we get an RC error.
-    const timer = setTimeout(() => {
-      console.warn("[RevenueCat] Init timed out — forcing rcReady");
-      setReady();
-    }, 6000);
-
     initializeRevenueCat()
-      .then(() => { clearTimeout(timer); setReady(); })
+      .then(() => { if (!cancelled) setRcReady(true); })
       .catch((err) => {
         console.warn("[RevenueCat] Init failed:", err);
-        clearTimeout(timer);
-        setReady();
+        if (!cancelled) setRcReady(true);
       });
-    return () => { cancelled = true; clearTimeout(timer); };
+    return () => { cancelled = true; };
   }, []);
 
   const customerInfoQuery = useQuery({
@@ -158,7 +146,7 @@ function useSubscriptionContext() {
     },
     enabled: rcReady,
     staleTime: 300 * 1000,
-    retry: 3,
+    retry: 1,
   });
 
   // ── Foreground + server-push listeners ─────────────────────────────────────
