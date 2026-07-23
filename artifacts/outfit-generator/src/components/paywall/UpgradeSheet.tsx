@@ -334,13 +334,13 @@ export function UpgradeSheet({ reason, onClose }: Props) {
         {/* Main purchase button */}
         <button
           onClick={handlePurchase}
-          disabled={status !== "idle" || isLoading}
+          disabled={status !== "idle"}
           className="w-full py-3.5 rounded-2xl font-display font-bold text-lg uppercase
                      tracking-tight border-[3px] border-black text-black
                      active:translate-x-0.5 active:translate-y-0.5 transition-all
                      disabled:opacity-60 disabled:cursor-not-allowed bg-primary"
           style={{
-            boxShadow: status !== "idle" || isLoading ? "none" : "4px 4px 0px 0px rgba(0,0,0,1)",
+            boxShadow: status !== "idle" ? "none" : "4px 4px 0px 0px rgba(0,0,0,1)",
           }}
         >
           {ctaLabel}
