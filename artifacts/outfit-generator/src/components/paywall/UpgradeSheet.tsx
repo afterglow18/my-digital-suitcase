@@ -177,8 +177,7 @@ export function UpgradeSheet({ reason, onClose }: Props) {
   };
 
   const ctaLabel =
-    isLoading              ? "Loading…"
-    : status === "pending" ? "Opening…"
+    status === "pending"      ? "Opening…"
     : selected === "lifetime" ? `UNLOCK FOREVER – ${prices.lifetime} ›`
     : selected === "yearly"   ? `SUBSCRIBE – ${prices.yearly}/YR ›`
     :                           `SUBSCRIBE – ${prices.monthly}/MO ›`;
