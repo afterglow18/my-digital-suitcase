@@ -163,7 +163,7 @@ function TierCard({
 // ── Sheet ─────────────────────────────────────────────────────────────────────
 
 export function UpgradeSheet({ reason, onClose }: Props) {
-  const { offerings, offeringsError, isLoading, purchase, restore } = useSubscription();
+  const { rcReady, offerings, offeringsError, isLoading, purchase, restore } = useSubscription();
   const [selected, setSelected] = useState<TierId>("lifetime");
   const [status,   setStatus]   = useState<"idle" | "pending" | "restoring">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -204,7 +204,7 @@ export function UpgradeSheet({ reason, onClose }: Props) {
       const diagMsg =
         `Platform: ${Capacitor.getPlatform()} | Native: ${Capacitor.isNativePlatform()}\n` +
         `RC Key: ${rcKey ? `set (${String(rcKey).length} chars)` : "MISSING ❌"}\n` +
-        `Offerings: ${offerings == null ? "null" : "loaded"} | ` +
+        `rcReady: ${rcReady} | Offerings: ${offerings == null ? "null" : "loaded"}\n` +
         `Pkgs: ${(offerings as any)?.current?.availablePackages?.length ?? "n/a"}\n` +
         `RC Error: ${offeringsError ? offeringsError.message : "none"}`;
       setErrorMsg(diagMsg);

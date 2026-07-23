@@ -76,18 +76,25 @@ function useSubscriptionContext() {
   const [rcReady, setRcReady] = React.useState(false);
 
   // Initialize RC inside the provider so queries are gated behind it.
-  // This replaces the fire-and-forget call in App.tsx and guarantees
-  // configure() is complete before either query fires.
+  // A 6-second timeout forces rcReady=true if configure() hangs on the native bridge.
   useEffect(() => {
     let cancelled = false;
+    const setReady = () => { if (!cancelled) setRcReady(true); };
+
+    // Fallback: if init hangs, unblock the queries after 6 s so we get an RC error.
+    const timer = setTimeout(() => {
+      console.warn("[RevenueCat] Init timed out — forcing rcReady");
+      setReady();
+    }, 6000);
+
     initializeRevenueCat()
-      .then(() => { if (!cancelled) setRcReady(true); })
+      .then(() => { clearTimeout(timer); setReady(); })
       .catch((err) => {
         console.warn("[RevenueCat] Init failed:", err);
-        // Still set ready so the UI doesn't hang — purchases will fail gracefully
-        if (!cancelled) setRcReady(true);
+        clearTimeout(timer);
+        setReady();
       });
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearTimeout(timer); };
   }, []);
 
   const customerInfoQuery = useQuery({
@@ -220,6 +227,7 @@ function useSubscriptionContext() {
     customerInfoQuery.data?.entitlements?.active?.[REVENUECAT_ENTITLEMENT_IDENTIFIER] !== undefined;
 
   return {
+    rcReady,
     customerInfo:   customerInfoQuery.data ?? null,
     offerings:      offeringsQuery.data ?? null,
     offeringsError: offeringsQuery.error as Error | null,
