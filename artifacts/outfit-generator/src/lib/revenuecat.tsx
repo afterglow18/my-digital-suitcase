@@ -126,25 +126,40 @@ function useSubscriptionContext() {
     queryFn: async () => {
       const Purchases = await getPurchases();
       if (!Purchases) return null;
-      const result = await Purchases.getOfferings();
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const r = result as any;
-      const resolved = r.current != null ? r : r.offerings ?? null;
-      // Prefer the "default" offering by identifier; fall back to current
-      const offering =
-        resolved?.all?.["default"] ?? resolved?.current ?? null;
-      console.log("[RevenueCat] getOfferings raw:", JSON.stringify({
-        hasCurrent: !!resolved?.current,
-        hasDefault: !!resolved?.all?.["default"],
-        offeringIdentifier: offering?.identifier,
-        packages: offering?.availablePackages?.map((p: any) => ({
-          id: p.identifier,
-          type: p.packageType,
-          productId: p.product?.productIdentifier ?? p.product?.identifier,
-        })),
-      }));
-      // Return a synthetic PurchasesOfferings with .current pointing at the default offering
-      return offering ? { ...resolved, current: offering } : resolved;
+      const result: any = await Purchases.getOfferings();
+
+      // Log the complete raw result so we can see exactly what RC + StoreKit returned.
+      console.log("[RevenueCat] getOfferings() full result:", JSON.stringify(result));
+
+      // RC Capacitor returns PurchasesOfferings: { current, all }.
+      // Use current directly; fall back to all["default"] if current is null.
+      const current = result?.current ?? result?.all?.["default"] ?? null;
+
+      if (!current) {
+        console.warn("[RevenueCat] No current offering. all keys:", Object.keys(result?.all ?? {}));
+        return result ?? null;
+      }
+
+      console.log("[RevenueCat] Offering identifier:", current.identifier);
+
+      // Log each package — missing product.priceString means StoreKit didn't return the product.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (current.availablePackages ?? []).forEach((pkg: any) => {
+        const p = pkg.product;
+        if (!p?.priceString) {
+          console.warn("[RevenueCat] StoreKit product MISSING for package:", pkg.identifier,
+            "productId:", p?.productIdentifier ?? p?.identifier ?? "n/a");
+        } else {
+          console.log("[RevenueCat] Package OK:", pkg.identifier,
+            pkg.packageType, p.priceString,
+            "productId:", p.productIdentifier ?? p.identifier);
+        }
+      });
+
+      // Ensure .current is set to the resolved offering before returning.
+      return current === result?.current ? result : { ...result, current };
     },
     enabled: rcReady,
     staleTime: 300 * 1000,
