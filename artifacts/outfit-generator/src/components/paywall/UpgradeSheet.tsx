@@ -159,24 +159,41 @@ export function UpgradeSheet({ reason, onClose }: Props) {
     setErrorMsg(null);
     setStatus("pending");
 
-    console.log("[Purchase] tap — offerings:", JSON.stringify({
-      hasCurrent: !!(offerings as any)?.current,
-      pkgId: TIER_DEFAULTS[selected].pkgId,
-    }));
+    // ── Step 1: try to get a live RC package from a fresh getOfferings() call ─
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let liveOfferings: any = offerings;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let freshError: any = null;
 
-    const pkg = getRcPackage(offerings, TIER_DEFAULTS[selected].pkgId);
-    console.log("[Purchase] resolved pkg:", pkg ? (pkg as any).identifier : "null");
+    try {
+      const { Purchases: P } = await import("@revenuecat/purchases-capacitor");
+      const fresh = await P.getOfferings();
+      console.log("[Purchase] fresh getOfferings:", JSON.stringify(fresh));
+      if (fresh != null) liveOfferings = fresh;
+    } catch (e) {
+      freshError = e instanceof Error ? e.message : String(e);
+      console.warn("[Purchase] fresh getOfferings threw:", freshError);
+    }
+
+    const pkgId = TIER_DEFAULTS[selected].pkgId;
+    const pkg = getRcPackage(liveOfferings, pkgId);
+    console.log("[Purchase] resolved pkg from fresh:", pkg ? (pkg as any).identifier : "null");
 
     if (!pkg) {
       setStatus("idle");
       const { Capacitor } = await import("@capacitor/core");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rcKey = (import.meta.env as any).VITE_REVENUECAT_IOS_KEY;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allKeys = Object.keys((liveOfferings as any)?.all ?? {}).join(",") || "none";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const numPkgs = (liveOfferings as any)?.current?.availablePackages?.length ?? "n/a";
       const diagMsg =
         `Platform: ${Capacitor.getPlatform()} | Native: ${Capacitor.isNativePlatform()}\n` +
         `RC Key: ${rcKey ? `set (${String(rcKey).length} chars)` : "MISSING ❌"}\n` +
-        `rcReady: ${rcReady} | Offerings: ${offerings == null ? "null" : "loaded"}\n` +
-        `Pkgs: ${(offerings as any)?.current?.availablePackages?.length ?? "n/a"}\n` +
+        `rcReady: ${rcReady} | Offerings: ${liveOfferings == null ? "null" : "loaded"}\n` +
+        `all keys: ${allKeys} | Pkgs: ${numPkgs}\n` +
+        `freshErr: ${freshError ?? "none"}\n` +
         `RC Error: ${offeringsError ? offeringsError.message : "none"}`;
       setErrorMsg(diagMsg);
       if (typeof window !== "undefined" && window.alert) window.alert(diagMsg);
@@ -190,12 +207,11 @@ export function UpgradeSheet({ reason, onClose }: Props) {
       onClose();
     } catch (err: unknown) {
       setStatus("idle");
-      // Show the raw error on screen so we can diagnose — including cancels
       const rawMsg = err instanceof Error ? err.message : String(err);
       console.error("[Purchase] error:", rawMsg);
       setErrorMsg("Error: " + rawMsg);
     }
-  }, [status, offerings, selected, purchase, onClose]);
+  }, [status, offerings, selected, purchase, onClose, rcReady, offeringsError]);
 
   const handleRestore = useCallback(async () => {
     if (status !== "idle") return;
