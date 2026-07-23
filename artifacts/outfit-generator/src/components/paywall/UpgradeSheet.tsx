@@ -198,10 +198,16 @@ export function UpgradeSheet({ reason, onClose }: Props) {
 
     if (!pkg) {
       setStatus("idle");
-      const msg = "Products not available. Please check your connection and try again.";
-      setErrorMsg(msg);
-      // Also alert so it's impossible to miss during testing
-      if (typeof window !== "undefined" && window.alert) window.alert("[RC] " + msg);
+      // Include diagnostic info so we can see it on screen without Xcode
+      const { Capacitor } = await import("@capacitor/core");
+      const diagMsg =
+        `Products not available.\n` +
+        `Platform: ${Capacitor.getPlatform()} | Native: ${Capacitor.isNativePlatform()}\n` +
+        `Offerings: ${offerings == null ? "null" : "loaded"} | ` +
+        `Pkgs: ${(offerings as any)?.current?.availablePackages?.length ?? "n/a"}\n` +
+        `Looking for: ${TIER_DEFAULTS[selected].pkgId}`;
+      setErrorMsg(diagMsg);
+      if (typeof window !== "undefined" && window.alert) window.alert(diagMsg);
       return;
     }
 
