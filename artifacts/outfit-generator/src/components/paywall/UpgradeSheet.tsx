@@ -198,14 +198,14 @@ export function UpgradeSheet({ reason, onClose }: Props) {
 
     if (!pkg) {
       setStatus("idle");
-      // Include diagnostic info so we can see it on screen without Xcode
       const { Capacitor } = await import("@capacitor/core");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rcKey = (import.meta.env as any).VITE_REVENUECAT_IOS_KEY;
       const diagMsg =
-        `Products not available.\n` +
         `Platform: ${Capacitor.getPlatform()} | Native: ${Capacitor.isNativePlatform()}\n` +
+        `RC Key: ${rcKey ? `set (${String(rcKey).length} chars)` : "MISSING ❌"}\n` +
         `Offerings: ${offerings == null ? "null" : "loaded"} | ` +
-        `Pkgs: ${(offerings as any)?.current?.availablePackages?.length ?? "n/a"}\n` +
-        `Looking for: ${TIER_DEFAULTS[selected].pkgId}`;
+        `Pkgs: ${(offerings as any)?.current?.availablePackages?.length ?? "n/a"}`;
       setErrorMsg(diagMsg);
       if (typeof window !== "undefined" && window.alert) window.alert(diagMsg);
       return;
