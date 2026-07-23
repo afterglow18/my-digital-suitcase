@@ -50,18 +50,26 @@ async function getPurchases(): Promise<PurchasesType | null> {
 
 // ── Initialization ────────────────────────────────────────────────────────────
 
+/** Resolves after `ms` milliseconds — used to race against hanging native calls. */
+function timeout(ms: number): Promise<never> {
+  return new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`Timed out after ${ms}ms`)), ms)
+  );
+}
+
 export async function initializeRevenueCat(): Promise<void> {
   const Purchases = await getPurchases();
   if (!Purchases) return;
 
   const apiKey = getApiKey();
 
-  try {
-    const { LOG_LEVEL } = await import("@revenuecat/purchases-capacitor");
-    await Purchases.setLogLevel({ level: LOG_LEVEL.DEBUG });
-  } catch { /* non-fatal */ }
-
-  await Purchases.configure({ apiKey });
+  // Race configure() against a 5-second timeout so a hanging native bridge
+  // doesn't block rcReady forever.  setLogLevel() is intentionally omitted —
+  // it can stall the bridge on some builds.
+  await Promise.race([
+    Purchases.configure({ apiKey }),
+    timeout(5000),
+  ]);
   console.log("[RevenueCat] Configured");
 }
 
