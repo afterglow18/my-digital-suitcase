@@ -32,13 +32,13 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Full-screen on mobile + iPad; phone frame only on xl desktop */}
       <div className="w-full xl:max-w-md bg-background h-[100dvh] xl:min-h-[850px] xl:h-[850px] xl:border-[6px] xl:border-black xl:rounded-[3rem] xl:shadow-2xl relative overflow-hidden flex flex-col xl:overflow-y-auto">
 
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto pb-[90px] relative">
+        {/* Main Content Area — ends exactly where the nav begins, no overlap */}
+        <main className="flex-1 overflow-y-auto relative">
           {children}
         </main>
 
-        {/* Bottom Navigation */}
-        <nav className="absolute bottom-0 left-0 right-0 bg-white border-t-[3px] border-black p-3 pb-safe z-[40]">
+        {/* Bottom Navigation — flex child so iOS scroll container never overlaps it */}
+        <nav className="shrink-0 bg-white border-t-[3px] border-black p-3 pb-safe z-[40]">
           <ul className="flex items-center justify-around">
             {navItems.map((item) => {
               const isActive = location === item.href;
