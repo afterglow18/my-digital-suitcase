@@ -69,18 +69,26 @@ export function setGlobalTier(t: Tier): void {
 
 /**
  * Fetch the current entitlement state from RevenueCat and update the global
- * tier to match. This is authoritative — if RC reports no active entitlement
- * (expired, refunded, or never purchased) the tier is downgraded to "free".
- * No-op on web (dev always runs in free mode).
+ * tier to match. Mutex-guarded so concurrent calls (e.g. purchase + appStateChange)
+ * share one in-flight request instead of racing on the native bridge.
  */
+let _syncPromise: Promise<void> | null = null;
+
 export async function syncTierFromRC(): Promise<void> {
-  const active = await checkSubscription();
-  if (active === "premium" || active === "unlock") {
-    setGlobalTier("unlock");
-  } else {
-    // No active entitlement → ensure access is revoked
-    setGlobalTier("free");
-  }
+  if (_syncPromise) return _syncPromise;
+  _syncPromise = (async () => {
+    try {
+      const active = await checkSubscription();
+      if (active === "premium" || active === "unlock") {
+        setGlobalTier("unlock");
+      } else {
+        setGlobalTier("free");
+      }
+    } finally {
+      _syncPromise = null;
+    }
+  })();
+  return _syncPromise;
 }
 
 // ── Purchase result ───────────────────────────────────────────────────────────
@@ -102,17 +110,15 @@ export function useEntitlements() {
 
     // Re-check whenever the app returns to the foreground so refunds / expirations
     // are detected without requiring a cold restart.
-    let removeListener: (() => void) | undefined;
-    import("@capacitor/app").then(({ App }) => {
+    // Store the handle promise so cleanup can always await and remove it.
+    const handlePromise = import("@capacitor/app").then(({ App }) =>
       App.addListener("appStateChange", ({ isActive }) => {
         if (isActive) syncTierFromRC();
-      }).then((handle) => {
-        removeListener = () => handle.remove();
-      });
-    });
+      })
+    );
 
     return () => {
-      removeListener?.();
+      handlePromise.then((handle) => handle.remove()).catch(() => {});
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
