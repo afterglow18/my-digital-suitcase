@@ -119,6 +119,10 @@ export function UpgradeSheet({ reason, onClose }: Props) {
   const [selected, setSelected] = useState<TierId>("lifetime");
   const [status,   setStatus]   = useState<"idle" | "pending" | "restoring">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Once we start closing, make the sheet non-interactive immediately so the
+  // nav bar is never blocked by the exit animation (fixed inset-0 overlay).
+  const [closing, setClosing] = useState(false);
+  const handleClose = useCallback(() => { setClosing(true); onClose(); }, [onClose]);
 
   const prices: Record<TierId, string> = {
     monthly:  priceFor("monthly"),
@@ -140,7 +144,7 @@ export function UpgradeSheet({ reason, onClose }: Props) {
 
     const result = await purchase(selected);
     if (result === "success") {
-      onClose();
+      handleClose();
     } else if (result === "unavailable") {
       setStatus("idle");
       setErrorMsg("Could not complete purchase. Please check your connection and try again.");
@@ -148,7 +152,7 @@ export function UpgradeSheet({ reason, onClose }: Props) {
       // cancelled — silent reset
       setStatus("idle");
     }
-  }, [status, loading, error, purchase, selected, onClose]);
+  }, [status, loading, error, purchase, selected, handleClose]);
 
   const handleRestore = useCallback(async () => {
     if (status !== "idle") return;
@@ -158,7 +162,7 @@ export function UpgradeSheet({ reason, onClose }: Props) {
       const active = await restorePurchases();
       if (active) {
         await syncTierFromRC();
-        onClose();
+        handleClose();
       } else {
         setStatus("idle");
         setErrorMsg("No purchases found for this Apple ID.");
@@ -167,7 +171,7 @@ export function UpgradeSheet({ reason, onClose }: Props) {
       setStatus("idle");
       setErrorMsg("Could not restore purchases. Please try again.");
     }
-  }, [status, onClose]);
+  }, [status, handleClose]);
 
   return (
     <motion.div
@@ -175,14 +179,14 @@ export function UpgradeSheet({ reason, onClose }: Props) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: "100%" }}
       transition={{ type: "spring", damping: 28, stiffness: 240 }}
-      className="fixed inset-0 z-[80] flex flex-col max-w-md mx-auto"
+      className={`fixed inset-0 z-[80] flex flex-col max-w-md mx-auto${closing ? " pointer-events-none" : ""}`}
       style={{ background: "#F8F4ED" }}
     >
       {/* Close button */}
       <div className="flex justify-end px-4 pb-0 flex-shrink-0"
         style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}>
         <button
-          onClick={onClose}
+          onClick={handleClose}
           aria-label="Close"
           className="w-9 h-9 rounded-full border-2 border-black flex items-center justify-center
                      bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]
@@ -310,7 +314,7 @@ export function UpgradeSheet({ reason, onClose }: Props) {
         {/* Maybe Later + Restore row */}
         <div className="flex items-center justify-between px-1">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-sm font-semibold text-black/35 hover:text-black/55 transition-colors"
           >
             Maybe Later
