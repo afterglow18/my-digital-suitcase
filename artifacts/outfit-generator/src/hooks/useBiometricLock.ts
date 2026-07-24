@@ -13,6 +13,7 @@ import { useState, useCallback } from "react";
 import {
   authenticate,
   checkBiometryAvailable,
+  type AuthResult,
   type BiometryType,
 } from "@/lib/biometric";
 
@@ -24,17 +25,19 @@ function labelFor(type: BiometryType): string {
   return "Biometrics";
 }
 
-export type { BiometryType };
+export type { BiometryType, AuthResult };
+
+export type LockToggleResult = "success" | "cancelled" | "denied" | "unavailable";
 
 export interface BiometricLock {
   isEnabled:    boolean;
   lockLabel:    string;
-  /** Prompt biometric auth. Returns true on success. */
-  authenticate: (reason: string) => Promise<boolean>;
-  /** Authenticate → enable lock. Returns true if enabled. */
-  enableLock:   () => Promise<boolean>;
-  /** Authenticate → disable lock. Returns true if disabled. */
-  disableLock:  () => Promise<boolean>;
+  /** Prompt biometric auth. Returns granular result. */
+  authenticate: (reason: string) => Promise<AuthResult>;
+  /** Authenticate → enable lock. */
+  enableLock:   () => Promise<LockToggleResult>;
+  /** Authenticate → disable lock. */
+  disableLock:  () => Promise<LockToggleResult>;
 }
 
 export function useBiometricLock(): BiometricLock {
@@ -43,30 +46,32 @@ export function useBiometricLock(): BiometricLock {
   );
 
   const auth = useCallback(
-    (reason: string): Promise<boolean> => authenticate(reason),
+    (reason: string): Promise<AuthResult> => authenticate(reason),
     [],
   );
 
-  const enableLock = useCallback(async (): Promise<boolean> => {
+  const enableLock = useCallback(async (): Promise<LockToggleResult> => {
     const type = await checkBiometryAvailable();
+    if (type === "none") return "unavailable";
     const label = labelFor(type);
-    const ok = await auth(`Enable ${label} lock`);
-    if (ok) {
+    const result = await auth(`Enable ${label} lock`);
+    if (result === "success") {
       localStorage.setItem(STORAGE_KEY, "1");
       setIsEnabled(true);
     }
-    return ok;
+    return result;
   }, [auth]);
 
-  const disableLock = useCallback(async (): Promise<boolean> => {
+  const disableLock = useCallback(async (): Promise<LockToggleResult> => {
     const type = await checkBiometryAvailable();
+    if (type === "none") return "unavailable";
     const label = labelFor(type);
-    const ok = await auth(`Confirm to turn off ${label} lock`);
-    if (ok) {
+    const result = await auth(`Confirm to turn off ${label} lock`);
+    if (result === "success") {
       localStorage.setItem(STORAGE_KEY, "0");
       setIsEnabled(false);
     }
-    return ok;
+    return result;
   }, [auth]);
 
   return {

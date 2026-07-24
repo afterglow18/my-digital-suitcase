@@ -98,12 +98,19 @@ export default function AccountPage() {
   const handleLockToggle = async () => {
     if (lockPending) return;
     setLockPending(true);
-    if (biometric.isEnabled) {
-      await biometric.disableLock();
-    } else {
-      await biometric.enableLock();
-    }
+    const result = biometric.isEnabled
+      ? await biometric.disableLock()
+      : await biometric.enableLock();
     setLockPending(false);
+
+    if (result === "denied") {
+      flash(
+        "error",
+        "Face ID permission is off. Go to Settings → Privacy & Security → Face ID & Passcode → My Suitcase and enable it.",
+      );
+    } else if (result === "unavailable") {
+      flash("error", "Face ID is not available on this device.");
+    }
   };
 
   const [exportPending, setExportPending] = useState(false);
