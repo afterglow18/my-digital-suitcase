@@ -28,7 +28,19 @@ import {
   TierCapabilities,
   PurchaseProduct,
 } from "@/lib/entitlements";
-import { checkSubscription, purchaseProduct } from "@/lib/revenuecat";
+import {
+  checkSubscription,
+  purchaseProduct,
+  registerCustomerInfoUpdateHandler,
+} from "@/lib/revenuecat";
+
+// ── Wire up RC's live customerInfo listener ───────────────────────────────────
+// Registered once at module load. When RC delivers a customerInfo update
+// (purchase completed externally, renewal, refund, etc.) we immediately
+// push the new tier without waiting for the next foreground/appStateChange.
+registerCustomerInfoUpdateHandler((hasEntitlement) => {
+  setGlobalTier(hasEntitlement ? "unlock" : "free");
+});
 
 // ── Shared external store ─────────────────────────────────────────────────────
 const STORAGE_KEY = "suitcase_tier";

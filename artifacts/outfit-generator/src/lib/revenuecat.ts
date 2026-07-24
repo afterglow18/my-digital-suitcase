@@ -13,6 +13,18 @@ const IOS_KEY = import.meta.env.VITE_REVENUECAT_IOS_KEY as string | undefined;
 let _initPromise: Promise<void> | null = null;
 let _initDone = false;
 
+/**
+ * Registered by useEntitlements so the RC customerInfo update listener
+ * can push tier changes without creating a circular import.
+ */
+let _customerInfoUpdateHandler: ((hasEntitlement: boolean) => void) | null = null;
+
+export function registerCustomerInfoUpdateHandler(
+  cb: (hasEntitlement: boolean) => void,
+): void {
+  _customerInfoUpdateHandler = cb;
+}
+
 /** Initialize RevenueCat. Call once on app startup before first render. */
 export async function initializeRevenueCat(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
@@ -30,6 +42,16 @@ export async function initializeRevenueCat(): Promise<void> {
     await Purchases.configure({ apiKey });
     _initDone = true;
     console.log("[RevenueCat] Initialized.");
+
+    // Push tier changes for any externally-completed purchases:
+    // App Store app, Family Sharing, deferred "Ask to Buy", renewals, etc.
+    Purchases.addCustomerInfoUpdateListener((customerInfo) => {
+      const hasEntitlement = !!(
+        customerInfo.entitlements.active["premium"] ||
+        customerInfo.entitlements.active["unlock"]
+      );
+      _customerInfoUpdateHandler?.(hasEntitlement);
+    });
   })();
 
   return _initPromise;
@@ -186,6 +208,22 @@ export async function purchaseRCPackage(pkg: PurchasesPackage): Promise<Purchase
       msg.toLowerCase().includes("cancel")
     ) {
       return "cancelled";
+    }
+    // Apple may have completed the transaction even though RC threw an error
+    // (network blip, race with customerInfoUpdate, etc.). Check entitlements
+    // before surfacing an error to the user.
+    try {
+      const { Purchases } = await import("@revenuecat/purchases-capacitor");
+      const { customerInfo } = await Purchases.getCustomerInfo();
+      if (
+        customerInfo.entitlements.active["premium"] ||
+        customerInfo.entitlements.active["unlock"]
+      ) {
+        console.warn("[RevenueCat] purchaseRCPackage threw but entitlement is active — treating as success.", err);
+        return "success";
+      }
+    } catch {
+      // ignore — fall through to "unavailable"
     }
     console.error("[RevenueCat] purchaseRCPackage error:", err);
     return "unavailable";
