@@ -8,7 +8,7 @@
  */
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, Upload, RefreshCw, Loader2, Check, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Download, Upload, RefreshCw, Loader2, Check, AlertTriangle } from "lucide-react";
 import { exportBackup, importBackup, pickBackupFile } from "@/lib/backup";
 import { restorePurchases } from "@/lib/revenuecat";
 import { useEntitlements, syncTierFromRC } from "@/hooks/useEntitlements";
@@ -19,9 +19,6 @@ import {
   getListOutfitsQueryKey,
   getWardrobeStatsQueryKey,
 } from "@/hooks/useLocalDB";
-import { Capacitor } from "@capacitor/core";
-import { useBiometricLock } from "@/hooks/useBiometricLock";
-
 
 // ─── Card shell ───────────────────────────────────────────────────────────────
 
@@ -36,7 +33,6 @@ function Card({
 }) {
   return (
     <div className="bg-white border-[3px] border-black rounded-2xl overflow-hidden">
-      {/* Header row */}
       <div className="flex items-center gap-2 px-4 py-3 border-b-[3px] border-black">
         <span className="text-xl leading-none">{emoji}</span>
         <h2 className="font-display font-bold text-base uppercase tracking-tight">{title}</h2>
@@ -46,7 +42,7 @@ function Card({
   );
 }
 
-// ─── Big yellow action button ─────────────────────────────────────────────────
+// ─── Big action button ────────────────────────────────────────────────────────
 
 function YellowButton({
   onClick,
@@ -86,33 +82,7 @@ export default function AccountPage() {
   const { tier } = useEntitlements();
   const isSubscribed = tier !== "free";
   const [isRestoring, setIsRestoring] = useState(false);
-
   const [showUpgrade, setShowUpgrade] = useState(false);
-
-  const biometric = useBiometricLock();
-  const [lockPending, setLockPending] = useState(false);
-  // Show the toggle on any native platform — no biometry check on mount.
-  // The actual Face ID / Touch ID dialog only fires when the user taps the toggle.
-  const showBiometricToggle = Capacitor.isNativePlatform();
-
-  const handleLockToggle = async () => {
-    if (lockPending) return;
-    setLockPending(true);
-    const result = biometric.isEnabled
-      ? await biometric.disableLock()
-      : await biometric.enableLock();
-    setLockPending(false);
-
-    if (result === "denied") {
-      flash(
-        "error",
-        "Face ID permission is off. Go to Settings → Privacy & Security → Face ID & Passcode → My Suitcase and enable it.",
-      );
-    } else if (result === "unavailable") {
-      flash("error", "Face ID is not available on this device.");
-    }
-  };
-
   const [exportPending, setExportPending] = useState(false);
   const [importPending, setImportPending] = useState(false);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -179,14 +149,12 @@ export default function AccountPage() {
       className="min-h-full flex flex-col px-4 pb-10"
       style={{ paddingTop: "max(2rem, env(safe-area-inset-top))", background: "#F5F0E8" }}
     >
-      {/* Page title */}
       <header className="mb-5">
         <h1 className="font-display font-bold text-4xl uppercase tracking-tighter leading-none">
           My Digital<br />Suitcase
         </h1>
       </header>
 
-      {/* Flash message */}
       <AnimatePresence>
         {msg && (
           <motion.div
@@ -207,9 +175,8 @@ export default function AccountPage() {
 
       <div className="flex flex-col gap-4">
 
-        {/* ── 1. MY PLAN ──────────────────────────────────────────────────── */}
+        {/* ── MY PLAN ─────────────────────────────────────────────────────── */}
         <Card emoji="👑" title="My Plan">
-          {/* Current plan row */}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-black/70">Current plan</span>
             <span
@@ -228,7 +195,6 @@ export default function AccountPage() {
             />
           )}
 
-          {/* Restore link */}
           <button
             onClick={handleRestore}
             disabled={isRestoring}
@@ -240,49 +206,7 @@ export default function AccountPage() {
           </button>
         </Card>
 
-        {/* ── 2. PRIVACY & SECURITY ───────────────────────────────────────── */}
-        {showBiometricToggle && (
-          <Card emoji="🔒" title="Privacy & Security">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <ShieldCheck className="w-5 h-5 shrink-0 text-black/60" />
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-black leading-tight">
-                    Lock with Face ID / Touch ID
-                  </p>
-                  <p className="text-xs text-black/45 leading-snug mt-0.5">
-                    Require biometrics when opening the app or returning from background.
-                  </p>
-                </div>
-              </div>
-
-              {/* Toggle */}
-              <button
-                role="switch"
-                aria-checked={biometric.isEnabled}
-                onClick={handleLockToggle}
-                disabled={lockPending}
-                className="shrink-0 relative w-12 h-7 rounded-full border-[2.5px] border-black
-                           transition-all disabled:opacity-50"
-                style={{
-                  background: biometric.isEnabled ? "#1a0800" : "#D9CFC3",
-                  boxShadow: "2px 2px 0px 0px rgba(0,0,0,1)",
-                }}
-              >
-                <span
-                  className="absolute top-0.5 w-5 h-5 rounded-full border-[2px] border-black
-                               transition-all duration-200"
-                  style={{
-                    background: "#F5F0E8",
-                    left: biometric.isEnabled ? "calc(100% - 1.375rem)" : "0.125rem",
-                  }}
-                />
-              </button>
-            </div>
-          </Card>
-        )}
-
-        {/* ── 3. BACKUP & RESTORE ─────────────────────────────────────────── */}
+        {/* ── BACKUP & RESTORE ────────────────────────────────────────────── */}
         <Card emoji="💾" title="Backup & Restore">
           <p className="text-sm text-black/60 leading-snug">
             Export your suitcase to a file. Save it to iCloud Drive or Files to
@@ -296,7 +220,6 @@ export default function AccountPage() {
             label="Export Backup"
           />
 
-          {/* Warning */}
           <p className="text-sm font-bold leading-snug" style={{ color: "#C0390B" }}>
             ⚠️ Deleting the app removes all your suitcase data.
             Export a backup first to keep it safe.
@@ -314,11 +237,9 @@ export default function AccountPage() {
           </p>
         </Card>
 
-        {/* ── 3. APP INFO ─────────────────────────────────────────────────── */}
+        {/* ── APP INFO ────────────────────────────────────────────────────── */}
         <Card emoji="🧳" title="My Digital Suitcase">
-          <p className="text-sm text-black/55 leading-snug">
-            Version 1.0.0
-          </p>
+          <p className="text-sm text-black/55 leading-snug">Version 1.0.0</p>
           <p className="text-sm text-black/55 leading-snug">
             Your suitcase stays on your device, works offline, and can be
             backed up with iCloud.
