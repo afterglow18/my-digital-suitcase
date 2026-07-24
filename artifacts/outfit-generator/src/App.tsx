@@ -8,9 +8,7 @@ import SavedPage from './pages/saved';
 import FavoritesPage from './pages/favorites';
 import AccountPage from './pages/account';
 import WelcomePage from './pages/welcome';
-import { SubscriptionProvider } from '@/lib/revenuecat';
 import { queryClient } from '@/lib/queryClient';
-import { BiometricLockProvider } from '@/context/BiometricLockContext';
 
 // ── First-launch welcome ──────────────────────────────────────────────────────
 const ENTERED_KEY = "suitcase-entered";
@@ -70,11 +68,7 @@ function AppShell() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <SubscriptionProvider>
-        <BiometricLockProvider>
-          <AppShell />
-        </BiometricLockProvider>
-      </SubscriptionProvider>
+      <AppShell />
     </QueryClientProvider>
   );
 }

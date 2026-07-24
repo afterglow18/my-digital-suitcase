@@ -8,12 +8,18 @@
  *   $rc_monthly   → Monthly  $1.99
  *   $rc_annual    → Yearly   $19.99
  *   $rc_lifetime  → Lifetime $9.99 (one-time)
+ *
+ * Loads real prices from RevenueCat on mount via useRCOfferings().
+ * Shows a loading spinner and retry button if offerings cannot be fetched.
  */
 import React, { useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { X, Check } from "lucide-react";
+import { X, Check, Loader2, RefreshCw } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
-import { useSubscription } from "@/lib/revenuecat";
+import { useRCOfferings } from "@/hooks/useRCOfferings";
+import { restorePurchases } from "@/lib/revenuecat";
+import { syncTierFromRC } from "@/hooks/useEntitlements";
+import type { PurchaseProduct } from "@/lib/entitlements";
 
 const PRIVACY_URL = "https://app.notion.com/p/My-Digital-Collection-Privacy-Policy-39682db6065380b19dedcb108d4a0ef4?source=copy_link";
 const TERMS_URL   = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
@@ -28,7 +34,7 @@ async function openUrl(url: string) {
 }
 
 export type UpgradeReason = "items" | "outfits" | "mannequin";
-type TierId = "monthly" | "yearly" | "lifetime";
+type TierId = PurchaseProduct;
 
 interface Props {
   reason:  UpgradeReason;
@@ -36,14 +42,6 @@ interface Props {
 }
 
 // ── Copy ──────────────────────────────────────────────────────────────────────
-
-const FEATURES = [
-  "Unlimited clothing items",
-  "Unlimited saved outfits",
-  "Save your entire wardrobe",
-  "One-time payment options",
-  "Choose monthly, yearly or lifetime!",
-] as const;
 
 const HEADLINES: Record<UpgradeReason, string> = {
   items:     "UNLOCK YOUR UNLIMITED DIGITAL SUITCASE",
@@ -57,37 +55,19 @@ const SUBTITLES: Record<UpgradeReason, string> = {
   mannequin: "A premium feature — unlock it once.",
 };
 
-// Fallback tier defs (browser — RC not available)
-const TIER_DEFAULTS: Record<TierId, {
+interface TierMeta {
+  id: TierId;
   label: string;
-  price: string;
   period: string;
   notes: [string, string];
-  pkgId: string;
   best?: true;
-}> = {
-  monthly:  { label: "MONTHLY",  price: "$1.99",  period: "/month",   notes: ["Cancel anytime",  "Billed monthly"],  pkgId: "$rc_monthly"  },
-  yearly:   { label: "YEARLY",   price: "$19.99", period: "/year",    notes: ["Save 17%",        "Billed yearly"],   pkgId: "$rc_annual"   },
-  lifetime: { label: "LIFETIME", price: "$9.99",  period: "one-time", notes: ["Pay once",        "Yours forever"],   pkgId: "$rc_lifetime", best: true },
-};
-
-const TIER_ORDER: TierId[] = ["monthly", "yearly", "lifetime"];
-
-// ── RC helpers ────────────────────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getRcPackage(offerings: any, pkgId: string): any | undefined {
-  // Use offerings.current directly; fall back to offerings.all["default"].
-  const offering = offerings?.current ?? offerings?.all?.["default"] ?? null;
-  const packages: any[] = offering?.availablePackages ?? [];
-  return packages.find((p: any) => p.identifier === pkgId) ?? undefined;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getLivePrice(offerings: any, pkgId: string, fallback: string): string {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (getRcPackage(offerings, pkgId) as any)?.product?.priceString ?? fallback;
-}
+const TIER_META: TierMeta[] = [
+  { id: "monthly",  label: "MONTHLY",  period: "/month",   notes: ["Cancel anytime", "Billed monthly"] },
+  { id: "annual",   label: "YEARLY",   period: "/year",    notes: ["Save 17%",       "Billed yearly"]  },
+  { id: "lifetime", label: "LIFETIME", period: "one-time", notes: ["Pay once",       "Yours forever"],  best: true },
+];
 
 // ── Tier card ─────────────────────────────────────────────────────────────────
 
@@ -135,96 +115,59 @@ function TierCard({
 // ── Sheet ─────────────────────────────────────────────────────────────────────
 
 export function UpgradeSheet({ reason, onClose }: Props) {
-  const { rcReady, offerings, offeringsError, isLoading, purchase, restore } = useSubscription();
+  const { loading, error, priceFor, retry, purchase } = useRCOfferings();
   const [selected, setSelected] = useState<TierId>("lifetime");
   const [status,   setStatus]   = useState<"idle" | "pending" | "restoring">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const offersReady = !isLoading && offerings !== null;
-
   const prices: Record<TierId, string> = {
-    monthly:  getLivePrice(offerings, "$rc_monthly",  "$1.99"),
-    yearly:   getLivePrice(offerings, "$rc_annual",   "$19.99"),
-    lifetime: getLivePrice(offerings, "$rc_lifetime", "$9.99"),
+    monthly:  priceFor("monthly"),
+    annual:   priceFor("annual"),
+    lifetime: priceFor("lifetime"),
   };
 
   const ctaLabel =
-    status === "pending"      ? "Opening…"
-    : selected === "lifetime" ? `UNLOCK FOREVER – ${prices.lifetime} ›`
-    : selected === "yearly"   ? `SUBSCRIBE – ${prices.yearly}/YR ›`
-    :                           `SUBSCRIBE – ${prices.monthly}/MO ›`;
+    status === "pending"       ? "Opening…"
+    : loading                  ? "Loading plans…"
+    : selected === "lifetime"  ? `UNLOCK FOREVER – ${prices.lifetime} ›`
+    : selected === "annual"    ? `SUBSCRIBE – ${prices.annual}/YR ›`
+    :                            `SUBSCRIBE – ${prices.monthly}/MO ›`;
 
   const handlePurchase = useCallback(async () => {
-    if (status !== "idle") return;
+    if (status !== "idle" || loading || !!error) return;
     setErrorMsg(null);
     setStatus("pending");
 
-    // ── Step 1: try to get a live RC package from a fresh getOfferings() call ─
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let liveOfferings: any = offerings;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let freshError: any = null;
-
-    try {
-      const { Purchases: P } = await import("@revenuecat/purchases-capacitor");
-      const fresh = await P.getOfferings();
-      console.log("[Purchase] fresh getOfferings:", JSON.stringify(fresh));
-      if (fresh != null) liveOfferings = fresh;
-    } catch (e) {
-      freshError = e instanceof Error ? e.message : String(e);
-      console.warn("[Purchase] fresh getOfferings threw:", freshError);
-    }
-
-    const pkgId = TIER_DEFAULTS[selected].pkgId;
-    const pkg = getRcPackage(liveOfferings, pkgId);
-    console.log("[Purchase] resolved pkg from fresh:", pkg ? (pkg as any).identifier : "null");
-
-    if (!pkg) {
-      setStatus("idle");
-      const { Capacitor } = await import("@capacitor/core");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rcKey = (import.meta.env as any).VITE_REVENUECAT_IOS_KEY;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const allKeys = Object.keys((liveOfferings as any)?.all ?? {}).join(",") || "none";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const numPkgs = (liveOfferings as any)?.current?.availablePackages?.length ?? "n/a";
-      const diagMsg =
-        `Platform: ${Capacitor.getPlatform()} | Native: ${Capacitor.isNativePlatform()}\n` +
-        `RC Key: ${rcKey ? `set (${String(rcKey).length} chars)` : "MISSING ❌"}\n` +
-        `rcReady: ${rcReady} | Offerings: ${liveOfferings == null ? "null" : "loaded"}\n` +
-        `all keys: ${allKeys} | Pkgs: ${numPkgs}\n` +
-        `freshErr: ${freshError ?? "none"}\n` +
-        `RC Error: ${offeringsError ? offeringsError.message : "none"}`;
-      setErrorMsg(diagMsg);
-      if (typeof window !== "undefined" && window.alert) window.alert(diagMsg);
-      return;
-    }
-
-    try {
-      console.log("[Purchase] calling purchasePackage…");
-      await purchase(pkg);
-      console.log("[Purchase] success");
+    const result = await purchase(selected);
+    if (result === "success") {
       onClose();
-    } catch (err: unknown) {
+    } else if (result === "unavailable") {
       setStatus("idle");
-      const rawMsg = err instanceof Error ? err.message : String(err);
-      console.error("[Purchase] error:", rawMsg);
-      setErrorMsg("Error: " + rawMsg);
+      setErrorMsg("Could not complete purchase. Please check your connection and try again.");
+    } else {
+      // cancelled — silent reset
+      setStatus("idle");
     }
-  }, [status, offerings, selected, purchase, onClose, rcReady, offeringsError]);
+  }, [status, loading, error, purchase, selected, onClose]);
 
   const handleRestore = useCallback(async () => {
     if (status !== "idle") return;
     setErrorMsg(null);
     setStatus("restoring");
     try {
-      await restore();
-      onClose();
+      const active = await restorePurchases();
+      if (active) {
+        await syncTierFromRC();
+        onClose();
+      } else {
+        setStatus("idle");
+        setErrorMsg("No purchases found for this Apple ID.");
+      }
     } catch {
       setStatus("idle");
       setErrorMsg("Could not restore purchases. Please try again.");
     }
-  }, [status, restore, onClose]);
+  }, [status, onClose]);
 
   return (
     <motion.div
@@ -284,24 +227,50 @@ export function UpgradeSheet({ reason, onClose }: Props) {
           <p className="text-[9px] font-bold uppercase tracking-widest text-black/35 text-center mb-1.5">
             Choose Your Plan
           </p>
-          <div className="flex gap-2">
-            {TIER_ORDER.map((id) => {
-              const t = TIER_DEFAULTS[id];
-              return (
+
+          {/* Loading state */}
+          {loading && (
+            <div className="flex items-center justify-center gap-2 py-4 text-black/40">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-xs font-semibold">Loading plans…</span>
+            </div>
+          )}
+
+          {/* Error state */}
+          {!loading && error && (
+            <div className="flex flex-col items-center gap-2 py-3">
+              <p className="text-xs font-semibold text-red-600 text-center leading-snug px-2">
+                Could not load plans. Check your connection.
+              </p>
+              <button
+                onClick={retry}
+                className="flex items-center gap-1.5 text-xs font-bold text-black/60
+                           border border-black/20 rounded-lg px-3 py-1.5"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Try Again
+              </button>
+            </div>
+          )}
+
+          {/* Tier cards */}
+          {!loading && !error && (
+            <div className="flex gap-2">
+              {TIER_META.map((t) => (
                 <TierCard
-                  key={id}
-                  id={id}
-                  selected={selected === id}
+                  key={t.id}
+                  id={t.id}
+                  selected={selected === t.id}
                   onSelect={setSelected}
                   label={t.label}
-                  price={prices[id]}
+                  price={prices[t.id]}
                   period={t.period}
                   notes={t.notes}
                   best={t.best}
                 />
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
       </div>
@@ -321,16 +290,21 @@ export function UpgradeSheet({ reason, onClose }: Props) {
         {/* Main purchase button */}
         <button
           onClick={handlePurchase}
-          disabled={status !== "idle"}
+          disabled={status !== "idle" || loading || !!error}
           className="w-full py-3.5 rounded-2xl font-display font-bold text-lg uppercase
                      tracking-tight border-[3px] border-black text-black
                      active:translate-x-0.5 active:translate-y-0.5 transition-all
                      disabled:opacity-60 disabled:cursor-not-allowed bg-primary"
           style={{
-            boxShadow: status !== "idle" ? "none" : "4px 4px 0px 0px rgba(0,0,0,1)",
+            boxShadow: (status !== "idle" || loading || !!error) ? "none" : "4px 4px 0px 0px rgba(0,0,0,1)",
           }}
         >
-          {ctaLabel}
+          {status === "pending" ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Opening…
+            </span>
+          ) : ctaLabel}
         </button>
 
         {/* Maybe Later + Restore row */}

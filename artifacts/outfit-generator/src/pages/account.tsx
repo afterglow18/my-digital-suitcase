@@ -10,7 +10,8 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Download, Upload, RefreshCw, Loader2, Check, AlertTriangle, ShieldCheck } from "lucide-react";
 import { exportBackup, importBackup, pickBackupFile } from "@/lib/backup";
-import { useSubscription } from "@/lib/revenuecat";
+import { restorePurchases } from "@/lib/revenuecat";
+import { useEntitlements, syncTierFromRC } from "@/hooks/useEntitlements";
 import { useQueryClient } from "@tanstack/react-query";
 import { UpgradeSheet } from "@/components/paywall/UpgradeSheet";
 import {
@@ -19,7 +20,7 @@ import {
   getWardrobeStatsQueryKey,
 } from "@/hooks/useLocalDB";
 import { Capacitor } from "@capacitor/core";
-import { useBiometricLock } from "@/context/BiometricLockContext";
+import { useBiometricLock } from "@/hooks/useBiometricLock";
 
 // ─── Card shell ───────────────────────────────────────────────────────────────
 
@@ -81,23 +82,26 @@ function YellowButton({
 
 export default function AccountPage() {
   const qc = useQueryClient();
-  const {
-    isSubscribed,
-    restore,
-    isRestoring,
-  } = useSubscription();
+  const { tier } = useEntitlements();
+  const isSubscribed = tier !== "free";
+  const [isRestoring, setIsRestoring] = useState(false);
 
   const [showUpgrade, setShowUpgrade] = useState(false);
 
-  const { isLockEnabled, setLockEnabled } = useBiometricLock();
+  const biometric = useBiometricLock();
   const [lockPending, setLockPending] = useState(false);
   // Show the toggle on any native platform — no biometry check on mount.
   // The actual Face ID / Touch ID dialog only fires when the user taps the toggle.
   const showBiometricToggle = Capacitor.isNativePlatform();
 
   const handleLockToggle = async () => {
+    if (lockPending) return;
     setLockPending(true);
-    await setLockEnabled(!isLockEnabled);
+    if (biometric.isEnabled) {
+      await biometric.disableLock();
+    } else {
+      await biometric.enableLock();
+    }
     setLockPending(false);
   };
 
@@ -145,11 +149,19 @@ export default function AccountPage() {
   };
 
   const handleRestore = async () => {
+    setIsRestoring(true);
     try {
-      await restore();
-      flash("success", "Purchases restored.");
+      const active = await restorePurchases();
+      if (active) {
+        await syncTierFromRC();
+        flash("success", "Purchases restored.");
+      } else {
+        flash("error", "No purchases found for this Apple ID.");
+      }
     } catch (err) {
       flash("error", err instanceof Error ? err.message : "Could not restore");
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -245,13 +257,13 @@ export default function AccountPage() {
               {/* Toggle */}
               <button
                 role="switch"
-                aria-checked={isLockEnabled}
+                aria-checked={biometric.isEnabled}
                 onClick={handleLockToggle}
                 disabled={lockPending}
                 className="shrink-0 relative w-12 h-7 rounded-full border-[2.5px] border-black
                            transition-all disabled:opacity-50"
                 style={{
-                  background: isLockEnabled ? "#1a0800" : "#D9CFC3",
+                  background: biometric.isEnabled ? "#1a0800" : "#D9CFC3",
                   boxShadow: "2px 2px 0px 0px rgba(0,0,0,1)",
                 }}
               >
@@ -260,7 +272,7 @@ export default function AccountPage() {
                                transition-all duration-200"
                   style={{
                     background: "#F5F0E8",
-                    left: isLockEnabled ? "calc(100% - 1.375rem)" : "0.125rem",
+                    left: biometric.isEnabled ? "calc(100% - 1.375rem)" : "0.125rem",
                   }}
                 />
               </button>

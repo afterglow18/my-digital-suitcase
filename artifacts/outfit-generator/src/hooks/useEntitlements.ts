@@ -1,67 +1,154 @@
 /**
- * useEntitlements — maps RevenueCat subscription state to the app's tier/caps model.
+ * useEntitlements
  *
- * Keeps the same public API as the old Stripe-backed version so pages need no
- * changes.  Under the hood it reads from useSubscription() (RevenueCat) instead
- * of localStorage + Stripe Checkout.
+ * RevenueCat is the single source of truth for premium access.
+ * localStorage is used only as the initial render value while the first
+ * RC network call is in-flight — it is never trusted on its own.
  *
- * Tier mapping:
- *   no active entitlement  → "free"  (up to 20 items, 5 outfits)
- *   "premium" entitlement  → "unlock" (unlimited items + outfits)
+ * Entitlement state is re-verified:
+ *   • On app launch (mount)
+ *   • Every time the app returns to the foreground (appStateChange)
+ *   • After a purchase completes
+ *   • After Restore Purchases completes
  *
- * PurchaseResult:
- *   "success"     — subscription activated
- *   "cancelled"   — user dismissed the native purchase sheet
- *   "unavailable" — not running on a native device, or no products loaded yet
+ * If RevenueCat reports no active entitlement (expired, refunded, or never
+ * purchased) the tier is set to "free" regardless of what is cached locally.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * TIER MAP
+ *
+ *   monthly / annual / lifetime  →  "unlock"  (unlimited items + outfits)
+ * ─────────────────────────────────────────────────────────────────────────────
  */
-import { useCallback } from "react";
-import { Tier, TIER_CAPS, TierCapabilities } from "@/lib/entitlements";
-import { useSubscription } from "@/lib/revenuecat";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { Capacitor } from "@capacitor/core";
+import {
+  Tier,
+  TIER_CAPS,
+  TierCapabilities,
+  PurchaseProduct,
+} from "@/lib/entitlements";
+import { checkSubscription, purchaseProduct } from "@/lib/revenuecat";
 
+// ── Shared external store ─────────────────────────────────────────────────────
+const STORAGE_KEY = "suitcase_tier";
+
+function readStoredTier(): Tier {
+  try {
+    const v = localStorage.getItem(STORAGE_KEY);
+    if (v === "unlock" || v === "premium") return v;
+  } catch {
+    // localStorage unavailable (rare private-browsing scenario)
+  }
+  return "free";
+}
+
+let _currentTier: Tier = readStoredTier();
+const _subscribers = new Set<() => void>();
+
+function subscribeTier(notify: () => void) {
+  _subscribers.add(notify);
+  return () => { _subscribers.delete(notify); };
+}
+
+function getTierSnapshot(): Tier {
+  return _currentTier;
+}
+
+/** Read the current tier without subscribing to updates. */
+export function getCurrentTier(): Tier {
+  return _currentTier;
+}
+
+/** Update the shared tier store and persist to localStorage. */
+export function setGlobalTier(t: Tier): void {
+  try { localStorage.setItem(STORAGE_KEY, t); } catch {}
+  _currentTier = t;
+  _subscribers.forEach((fn) => fn());
+}
+
+/**
+ * Fetch the current entitlement state from RevenueCat and update the global
+ * tier to match. This is authoritative — if RC reports no active entitlement
+ * (expired, refunded, or never purchased) the tier is downgraded to "free".
+ * No-op on web (dev always runs in free mode).
+ */
+export async function syncTierFromRC(): Promise<void> {
+  const active = await checkSubscription();
+  if (active === "premium" || active === "unlock") {
+    setGlobalTier("unlock");
+  } else {
+    // No active entitlement → ensure access is revoked
+    setGlobalTier("free");
+  }
+}
+
+// ── Purchase result ───────────────────────────────────────────────────────────
 export type PurchaseResult = "success" | "cancelled" | "unavailable";
-export type PurchaseProduct = "unlock" | "premium"; // kept for call-site compat
 
-// setGlobalTier is no longer needed (RC manages state) but keep the export so
-// App.tsx doesn't need special-casing if any old import remains.
-export function setGlobalTier(_t: Tier): void { /* no-op */ }
+// ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useEntitlements() {
-  const { isSubscribed, offerings, purchase: rcPurchase, isPurchasing } =
-    useSubscription();
-
-  // Both "unlock" and "premium" products now map to the RC "unlock" tier.
-  const tier: Tier = isSubscribed ? "unlock" : "free";
+  const tier = useSyncExternalStore(subscribeTier, getTierSnapshot);
   const caps: TierCapabilities = TIER_CAPS[tier];
+  const [isPurchasing, setIsPurchasing] = useState(false);
 
+  // ── Sync on launch + every foreground resume ────────────────────────────────
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    // Check on app launch
+    syncTierFromRC();
+
+    // Re-check whenever the app returns to the foreground so refunds / expirations
+    // are detected without requiring a cold restart.
+    let removeListener: (() => void) | undefined;
+    import("@capacitor/app").then(({ App }) => {
+      App.addListener("appStateChange", ({ isActive }) => {
+        if (isActive) syncTierFromRC();
+      }).then((handle) => {
+        removeListener = () => handle.remove();
+      });
+    });
+
+    return () => {
+      removeListener?.();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** True if the user can add another item given the current wardrobe size. */
   const canAddItem = useCallback(
-    (count: number) => caps.maxItems === null || count < caps.maxItems,
+    (currentCount: number) =>
+      caps.maxItems === null || currentCount < caps.maxItems,
     [caps.maxItems],
   );
 
+  /** True if the user can save another outfit given the current saved count. */
   const canSaveOutfit = useCallback(
-    (count: number) => caps.maxOutfits === null || count < caps.maxOutfits,
+    (currentCount: number) =>
+      caps.maxOutfits === null || currentCount < caps.maxOutfits,
     [caps.maxOutfits],
   );
 
+  /**
+   * Trigger the purchase flow via RevenueCat / Apple StoreKit.
+   * After a successful purchase, re-reads the entitlement from RevenueCat to
+   * set the tier authoritatively — never infers it from the product type alone.
+   */
   const purchase = useCallback(
-    async (_product: PurchaseProduct): Promise<PurchaseResult> => {
-      const pkg = offerings?.current?.availablePackages?.[0];
-      if (!pkg) return "unavailable";
-
+    async (product: PurchaseProduct): Promise<PurchaseResult> => {
+      setIsPurchasing(true);
       try {
-        await rcPurchase(pkg);
-        return "success";
-      } catch (err: unknown) {
-        // RevenueCat throws with userCancelled flag on user dismiss
-        if (err && typeof err === "object" && "userCancelled" in err) {
-          return "cancelled";
+        const result = await purchaseProduct(product);
+        if (result === "success") {
+          await syncTierFromRC();
         }
-        const msg = err instanceof Error ? err.message.toLowerCase() : "";
-        if (msg.includes("cancel") || msg.includes("dismiss")) return "cancelled";
-        return "unavailable";
+        return result;
+      } finally {
+        setIsPurchasing(false);
       }
     },
-    [offerings, rcPurchase],
+    [],
   );
 
   return { tier, caps, canAddItem, canSaveOutfit, purchase, isPurchasing };
