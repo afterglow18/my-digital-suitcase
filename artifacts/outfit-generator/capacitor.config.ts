@@ -15,6 +15,11 @@ const config: CapacitorConfig = {
     backgroundColor: '#F9F4EE',
     // Allow inline media playback (used for wardrobe image previews)
     allowsInlineMediaPlayback: true,
+    // Required by Apple — without this key iOS silently denies Face ID
+    infoPlist: {
+      NSFaceIDUsageDescription:
+        'My Digital Suitcase uses Face ID to lock your suitcase and keep your wardrobe private.',
+    },
   },
 
   plugins: {
