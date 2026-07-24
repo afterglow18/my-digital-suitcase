@@ -22,6 +22,7 @@ import {
 import { Capacitor } from "@capacitor/core";
 import { useBiometricLock } from "@/hooks/useBiometricLock";
 
+
 // ─── Card shell ───────────────────────────────────────────────────────────────
 
 function Card({

@@ -5,8 +5,11 @@
  *   - Reads/writes localStorage key `suitcase_biometric_lock`
  *   - Wraps the biometric.ts auth helper for Face ID / Touch ID prompts
  *   - enableLock / disableLock each require a successful auth first
+ *
+ * Biometry availability is checked lazily (on first enable/disable tap) rather
+ * than on mount, so it never fires a native bridge call during page load.
  */
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import {
   authenticate,
   checkBiometryAvailable,
@@ -25,8 +28,6 @@ export type { BiometryType };
 
 export interface BiometricLock {
   isEnabled:    boolean;
-  isAvailable:  boolean;
-  biometryType: BiometryType;
   lockLabel:    string;
   /** Prompt biometric auth. Returns true on success. */
   authenticate: (reason: string) => Promise<boolean>;
@@ -40,20 +41,6 @@ export function useBiometricLock(): BiometricLock {
   const [isEnabled, setIsEnabled] = useState(
     () => localStorage.getItem(STORAGE_KEY) === "1",
   );
-  const [isAvailable, setIsAvailable] = useState(false);
-  const [biometryType, setBiometryType] = useState<BiometryType>("none");
-
-  // Check hardware availability once on mount
-  useEffect(() => {
-    checkBiometryAvailable()
-      .then((type) => {
-        setIsAvailable(type !== "none");
-        setBiometryType(type);
-      })
-      .catch(() => {
-        setIsAvailable(false);
-      });
-  }, []);
 
   const auth = useCallback(
     (reason: string): Promise<boolean> => authenticate(reason),
@@ -61,28 +48,30 @@ export function useBiometricLock(): BiometricLock {
   );
 
   const enableLock = useCallback(async (): Promise<boolean> => {
-    const ok = await auth(`Enable ${labelFor(biometryType)} lock`);
+    const type = await checkBiometryAvailable();
+    const label = labelFor(type);
+    const ok = await auth(`Enable ${label} lock`);
     if (ok) {
       localStorage.setItem(STORAGE_KEY, "1");
       setIsEnabled(true);
     }
     return ok;
-  }, [auth, biometryType]);
+  }, [auth]);
 
   const disableLock = useCallback(async (): Promise<boolean> => {
-    const ok = await auth(`Confirm to turn off ${labelFor(biometryType)} lock`);
+    const type = await checkBiometryAvailable();
+    const label = labelFor(type);
+    const ok = await auth(`Confirm to turn off ${label} lock`);
     if (ok) {
       localStorage.setItem(STORAGE_KEY, "0");
       setIsEnabled(false);
     }
     return ok;
-  }, [auth, biometryType]);
+  }, [auth]);
 
   return {
     isEnabled,
-    isAvailable,
-    biometryType,
-    lockLabel:    labelFor(biometryType),
+    lockLabel: "Face ID / Touch ID",
     authenticate: auth,
     enableLock,
     disableLock,
