@@ -6,9 +6,9 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  X, Heart, Trash2, Save, ChevronDown, Sparkles, Loader2,
+  X, Heart, Trash2, Save, ChevronDown, Sparkles,
 } from "lucide-react";
-import { removeBackground } from "@/lib/backgroundRemoval";
+import { BgRemovalSheet } from "./BgRemovalSheet";
 import {
   type ClothingItem,
   type ClothingItemUpdateCategory,
@@ -149,19 +149,25 @@ function isDirty(form: FormState, item: ClothingItem): boolean {
 }
 
 export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetProps) {
-  const [form, setForm]           = useState<FormState | null>(null);
+  const [form, setForm]                   = useState<FormState | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [bgRemoving, setBgRemoving] = useState(false);
-  const [bgError,    setBgError]    = useState<string | null>(null);
+  const [showBgRemoval, setShowBgRemoval] = useState(false);
+  // Optimistic image — updated immediately when user confirms in BgRemovalSheet
+  // so the photo on screen changes before the DB write finishes.
+  const [displayImagePath, setDisplayImagePath] = useState<string | null>(null);
 
   const updateItem  = useUpdateClothingItem();
   const deleteItem  = useDeleteClothingItem();
   const queryClient = useQueryClient();
 
-  // Reset form whenever item changes
+  // Reset form + image state whenever item changes
   useEffect(() => {
-    if (item) setForm(toForm(item));
+    if (item) {
+      setForm(toForm(item));
+      setDisplayImagePath(item.imageObjectPath ?? null);
+    }
     setShowDeleteConfirm(false);
+    setShowBgRemoval(false);
   }, [item?.id]);
 
   if (!item || !form) return null;
@@ -283,55 +289,25 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
               backgroundSize: "16px 16px",
             }}
           >
+            {/* displayImagePath is updated optimistically before the DB write finishes */}
             <img
-              src={getImageUrl(item.imageObjectPath)!}
+              src={getImageUrl(displayImagePath ?? item.imageObjectPath)!}
               alt={item.name}
               className="w-full h-full object-contain"
             />
           </div>
-          {/* Remove Background button */}
-          <div className="px-4 py-3 bg-white border-t border-black/10 flex flex-col gap-1">
+          {/* Clean Up Photo button */}
+          <div className="px-4 py-3 bg-white border-t border-black/10">
             <button
-              onClick={async () => {
-                if (bgRemoving || !item.imageObjectPath) return;
-                setBgRemoving(true);
-                setBgError(null);
-                try {
-                  const resultUrl = await removeBackground(item.imageObjectPath);
-                  await new Promise<void>((resolve, reject) => {
-                    updateItem.mutate(
-                      { id: item.id, data: { imageObjectPath: resultUrl } },
-                      {
-                        onSuccess: () => {
-                          queryClient.invalidateQueries({ queryKey: getListClothingQueryKey() });
-                          queryClient.invalidateQueries({ queryKey: getListOutfitsQueryKey() });
-                          queryClient.invalidateQueries({ queryKey: getWardrobeStatsQueryKey() });
-                          resolve();
-                        },
-                        onError: reject,
-                      },
-                    );
-                  });
-                } catch {
-                  setBgError("Could not remove background. Please try again.");
-                } finally {
-                  setBgRemoving(false);
-                }
-              }}
-              disabled={bgRemoving}
+              onClick={() => setShowBgRemoval(true)}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
                          border-2 border-black bg-white font-display font-bold text-sm uppercase
                          shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]
-                         active:translate-x-0.5 active:translate-y-0.5 active:shadow-none
-                         transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                         active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
             >
-              {bgRemoving
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Removing Background…</>
-                : <><Sparkles className="w-4 h-4" /> Remove Background ✨</>}
+              <Sparkles className="w-4 h-4" />
+              Clean Up Photo ✨
             </button>
-            {bgError && (
-              <p className="text-xs text-red-600 text-center">{bgError}</p>
-            )}
           </div>
         </div>
       )}
@@ -458,5 +434,31 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
         )}
       </div>
     </motion.div>
+
+    {/* ── BgRemovalSheet overlay ── */}
+    <AnimatePresence>
+      {showBgRemoval && item.imageObjectPath && (
+        <BgRemovalSheet
+          imageObjectPath={displayImagePath ?? item.imageObjectPath}
+          itemName={item.name}
+          onSaved={(chosenUrl) => {
+            // Update the photo on screen immediately — no waiting for DB.
+            setDisplayImagePath(chosenUrl);
+            // Fire the DB write in the background.
+            updateItem.mutate(
+              { id: item.id, data: { imageObjectPath: chosenUrl } },
+              {
+                onSuccess: () => {
+                  queryClient.invalidateQueries({ queryKey: getListClothingQueryKey() });
+                  queryClient.invalidateQueries({ queryKey: getListOutfitsQueryKey() });
+                  queryClient.invalidateQueries({ queryKey: getWardrobeStatsQueryKey() });
+                },
+              },
+            );
+          }}
+          onClose={() => setShowBgRemoval(false)}
+        />
+      )}
+    </AnimatePresence>
   );
 }
