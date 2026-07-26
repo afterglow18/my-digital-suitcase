@@ -6,8 +6,9 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  X, Heart, Trash2, Save, ChevronDown,
+  X, Heart, Trash2, Save, ChevronDown, Sparkles, Loader2,
 } from "lucide-react";
+import { removeBackground } from "@/lib/backgroundRemoval";
 import {
   type ClothingItem,
   type ClothingItemUpdateCategory,
@@ -150,6 +151,8 @@ function isDirty(form: FormState, item: ClothingItem): boolean {
 export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetProps) {
   const [form, setForm]           = useState<FormState | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [bgRemoving, setBgRemoving] = useState(false);
+  const [bgError,    setBgError]    = useState<string | null>(null);
 
   const updateItem  = useUpdateClothingItem();
   const deleteItem  = useDeleteClothingItem();
@@ -272,18 +275,64 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
 
       {/* ── Photo ── */}
       {item.imageObjectPath && (
-        <div
-          className="w-full h-52 flex-shrink-0 border-b-2 border-black"
-          style={{
-            backgroundImage: "repeating-conic-gradient(#e5e7eb 0% 25%, white 0% 50%)",
-            backgroundSize: "16px 16px",
-          }}
-        >
-          <img
-            src={getImageUrl(item.imageObjectPath)!}
-            alt={item.name}
-            className="w-full h-full object-contain"
-          />
+        <div className="flex-shrink-0 border-b-2 border-black">
+          <div
+            className="w-full h-52"
+            style={{
+              backgroundImage: "repeating-conic-gradient(#e5e7eb 0% 25%, white 0% 50%)",
+              backgroundSize: "16px 16px",
+            }}
+          >
+            <img
+              src={getImageUrl(item.imageObjectPath)!}
+              alt={item.name}
+              className="w-full h-full object-contain"
+            />
+          </div>
+          {/* Remove Background button */}
+          <div className="px-4 py-3 bg-white border-t border-black/10 flex flex-col gap-1">
+            <button
+              onClick={async () => {
+                if (bgRemoving || !item.imageObjectPath) return;
+                setBgRemoving(true);
+                setBgError(null);
+                try {
+                  const resultUrl = await removeBackground(item.imageObjectPath);
+                  await new Promise<void>((resolve, reject) => {
+                    updateItem.mutate(
+                      { id: item.id, data: { imageObjectPath: resultUrl } },
+                      {
+                        onSuccess: () => {
+                          queryClient.invalidateQueries({ queryKey: getListClothingQueryKey() });
+                          queryClient.invalidateQueries({ queryKey: getListOutfitsQueryKey() });
+                          queryClient.invalidateQueries({ queryKey: getWardrobeStatsQueryKey() });
+                          resolve();
+                        },
+                        onError: reject,
+                      },
+                    );
+                  });
+                } catch {
+                  setBgError("Could not remove background. Please try again.");
+                } finally {
+                  setBgRemoving(false);
+                }
+              }}
+              disabled={bgRemoving}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
+                         border-2 border-black bg-white font-display font-bold text-sm uppercase
+                         shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]
+                         active:translate-x-0.5 active:translate-y-0.5 active:shadow-none
+                         transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+            >
+              {bgRemoving
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Removing Background…</>
+                : <><Sparkles className="w-4 h-4" /> Remove Background ✨</>}
+            </button>
+            {bgError && (
+              <p className="text-xs text-red-600 text-center">{bgError}</p>
+            )}
+          </div>
         </div>
       )}
 

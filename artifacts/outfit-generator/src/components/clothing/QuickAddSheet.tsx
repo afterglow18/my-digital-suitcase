@@ -22,6 +22,7 @@ import {
   blobToDataUrl as blobToRawDataUrl,
   dataUrlToBlob,
 } from "@/lib/backgroundRemoval";
+import type { ClothingItem } from "@/lib/db";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -127,6 +128,7 @@ export function QuickAddSheet({ open, onOpenChange, category, existingCount, onC
   const [bgProcessing, setBgProcessing] = useState(false);
   const [bgFailed,     setBgFailed]     = useState(false);
   const [selected,     setSelected]     = useState<"original" | "cleaned">("original");
+  const [progress,     setProgress]     = useState<{ current: number; total: number } | null>(null);
 
   // Each photo bumps this counter. Every async step checks it before writing state —
   // prevents a slow first photo from clobbering a fast second one.
@@ -247,10 +249,61 @@ export function QuickAddSheet({ open, onOpenChange, category, existingCount, onC
     }
   }, [selected, cleanedBlob, originalBlob, category, existingCount, createItem, queryClient, onCreated, handleClose]);
 
+  // ── Batch save (multiple files, no comparison UI) ────────────────────────
+  const saveOneFile = useCallback(async (file: File, itemIndex: number): Promise<boolean> => {
+    let jpeg: Blob;
+    try { jpeg = await encodeForUpload(file); } catch { return false; }
+    try {
+      const path     = await blobToStorageDataUrl(jpeg);
+      const label    = CATEGORY_LABELS[category];
+      const n        = itemIndex + 1;
+      const autoName = n === 1 ? label : `${label} ${n}`;
+      await new Promise<void>((resolve, reject) => {
+        createItem.mutate(
+          { data: { name: autoName, category, imageObjectPath: path } },
+          {
+            onSuccess: (createdItem) => {
+              queryClient.invalidateQueries({ queryKey: getListClothingQueryKey() });
+              queryClient.invalidateQueries({ queryKey: getWardrobeStatsQueryKey() });
+              if (onCreated) onCreated(createdItem);
+              resolve();
+            },
+            onError: reject,
+          },
+        );
+      });
+      return true;
+    } catch { return false; }
+  }, [category, createItem, queryClient, onCreated]);
+
+  const handleFiles = useCallback(async (files: File[]) => {
+    setErrorMsg(null);
+    setPhase("uploading");
+    setProgress({ current: 0, total: files.length });
+    let failed = 0;
+    for (let i = 0; i < files.length; i++) {
+      setProgress({ current: i + 1, total: files.length });
+      const ok = await saveOneFile(files[i], existingCount + i);
+      if (!ok) failed++;
+    }
+    setProgress(null);
+    if (failed > 0) {
+      setErrorMsg(`${failed} photo${failed > 1 ? "s" : ""} could not be saved. Please try again.`);
+      setPhase("pick");
+    } else {
+      handleClose();
+    }
+  }, [saveOneFile, existingCount, handleClose]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFile(file);
+    const files = Array.from(e.target.files ?? []);
     e.target.value = "";
+    if (!files.length) return;
+    if (files.length === 1) {
+      handleFile(files[0]);   // single → comparison UI
+    } else {
+      handleFiles(files);     // multiple → batch upload
+    }
   };
 
   if (!open) return null;
@@ -537,7 +590,11 @@ export function QuickAddSheet({ open, onOpenChange, category, existingCount, onC
             </div>
             <div className="text-center">
               <p className="font-display font-bold text-2xl uppercase tracking-tight">Saving…</p>
-              <p className="text-sm text-black/50 mt-1">Adding to your suitcase.</p>
+              <p className="text-sm text-black/50 mt-1">
+                {progress && progress.total > 1
+                  ? `Photo ${progress.current} of ${progress.total}`
+                  : "Adding to your suitcase."}
+              </p>
             </div>
           </div>
         )}
@@ -554,11 +611,12 @@ export function QuickAddSheet({ open, onOpenChange, category, existingCount, onC
         className="hidden"
         onChange={handleInputChange}
       />
-      {/* Gallery — opens photo library / file picker */}
+      {/* Gallery — opens photo library / file picker (multiple allowed) */}
       <input
         ref={galleryInputRef}
         type="file"
         accept="image/*"
+        multiple
         className="hidden"
         onChange={handleInputChange}
       />
