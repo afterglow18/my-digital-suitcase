@@ -405,7 +405,7 @@ export function QuickAddSheet({ open, onOpenChange, category, existingCount, onC
                   padding: 0,
                 }}
               >
-                <div style={{ background: "#111", minHeight: 176, position: "relative" }}>
+                <div style={{ background: "#c8b49a", minHeight: 176, position: "relative" }}>
                   {originalUrl && (
                     <img
                       src={originalUrl}
