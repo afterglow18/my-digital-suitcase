@@ -48,7 +48,11 @@ export default defineConfig({
       : []),
   ],
   optimizeDeps: {
-    exclude: ['@imgly/background-removal'],
+    // Both packages must be excluded from Vite pre-bundling.
+    // onnxruntime-web ships native WASM glue that breaks when bundled;
+    // pre-bundling it mid-session also causes a full page reload that
+    // corrupts React's internal dispatcher.
+    exclude: ['@imgly/background-removal', 'onnxruntime-web'],
   },
   resolve: {
     alias: {
