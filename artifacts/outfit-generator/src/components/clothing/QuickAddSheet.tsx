@@ -388,7 +388,7 @@ export function QuickAddSheet({ open, onOpenChange, category, existingCount, onC
             )}
 
             <p className="text-center font-display font-bold text-xs uppercase tracking-widest opacity-40">
-              {bgProcessing ? "This will take a moment…" : bgFailed ? "Original" : "Tap to choose"}
+              {bgProcessing ? "This will take a moment…" : bgFailed ? "Tap to choose" : "Tap to choose"}
             </p>
 
             {/* Side-by-side cards */}
