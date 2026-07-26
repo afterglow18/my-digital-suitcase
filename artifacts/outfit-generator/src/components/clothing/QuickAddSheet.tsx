@@ -20,6 +20,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   removeBackground,
   blobToDataUrl as blobToRawDataUrl,
+  dataUrlToBlob,
 } from "@/lib/backgroundRemoval";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -187,9 +188,11 @@ export function QuickAddSheet({ open, onOpenChange, category, existingCount, onC
     // Background removal — generation guard discards stale results
     setBgProcessing(true);
     try {
+      const dataUrl = await blobToRawDataUrl(jpeg);
       if (bgGenRef.current !== myGen) return;
-      const resultBlob   = await removeBackground(jpeg);
+      const resultUrl    = await removeBackground(dataUrl);
       if (bgGenRef.current !== myGen) return;
+      const resultBlob   = await dataUrlToBlob(resultUrl);
       const resultObjUrl = URL.createObjectURL(resultBlob);
       if (bgGenRef.current !== myGen) { URL.revokeObjectURL(resultObjUrl); return; }
       setCleanedBlob(resultBlob);
