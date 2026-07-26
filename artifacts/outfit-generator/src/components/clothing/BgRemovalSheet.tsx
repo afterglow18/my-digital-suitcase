@@ -22,8 +22,11 @@ interface Props {
   /** The stored data-URL (or path) of the current item image. */
   imageObjectPath: string;
   itemName: string;
-  /** Called immediately when the user confirms — before the DB write. */
-  onSaved: (chosenDataUrl: string) => void;
+  /**
+   * Called immediately when the user confirms — before the DB write.
+   * `wasCleaned` is true when the user kept the cleaned version, false for original.
+   */
+  onSaved: (chosenDataUrl: string, wasCleaned: boolean) => void;
   onClose: () => void;
 }
 
@@ -68,8 +71,9 @@ export function BgRemovalSheet({ imageObjectPath, itemName, onSaved, onClose }: 
   };
 
   const handleSave = () => {
-    const chosen = selected === "cleaned" && cleanedUrl ? cleanedUrl : imageObjectPath;
-    onSaved(chosen);
+    const wasCleaned = selected === "cleaned" && !!cleanedUrl;
+    const chosen     = wasCleaned ? cleanedUrl! : imageObjectPath;
+    onSaved(chosen, wasCleaned);
     onClose();
   };
 

@@ -50,6 +50,7 @@ export async function createClothingItem(data: {
     imageObjectPath: data.imageObjectPath ?? null,
     isFavorite:     false,
     timesWorn:      0,
+    bgRemoved:      false,
     color:          data.color ?? null,
     brand:          data.brand ?? null,
     size:           data.size  ?? null,

@@ -26,6 +26,7 @@ export interface StoredClothingItem {
   imageObjectPath: string | null; // JPEG data URL  (e.g. "data:image/jpeg;base64,...")
   isFavorite:     boolean;
   timesWorn:      number;
+  bgRemoved?:     boolean;       // true once background removal has been applied & saved
   color?:         string | null;
   brand?:         string | null;
   size?:          string | null;

@@ -154,7 +154,10 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
   const [showBgRemoval, setShowBgRemoval] = useState(false);
   // Optimistic image — updated immediately when user confirms in BgRemovalSheet
   // so the photo on screen changes before the DB write finishes.
-  const [displayImagePath, setDisplayImagePath] = useState<string | null>(null);
+  const [displayImagePath,  setDisplayImagePath]  = useState<string | null>(null);
+  // Optimistic bgRemoved — set true immediately when the user confirms a clean
+  // so the button disappears before the DB write completes.
+  const [localBgRemoved, setLocalBgRemoved] = useState(false);
 
   const updateItem  = useUpdateClothingItem();
   const deleteItem  = useDeleteClothingItem();
@@ -165,6 +168,7 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
     if (item) {
       setForm(toForm(item));
       setDisplayImagePath(item.imageObjectPath ?? null);
+      setLocalBgRemoved(item.bgRemoved ?? false);
     }
     setShowDeleteConfirm(false);
     setShowBgRemoval(false);
@@ -297,19 +301,21 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
               className="w-full h-full object-contain"
             />
           </div>
-          {/* Clean Up Photo button */}
-          <div className="px-4 py-3 bg-white border-t border-black/10">
-            <button
-              onClick={() => setShowBgRemoval(true)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
-                         border-2 border-black bg-white font-display font-bold text-sm uppercase
-                         shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]
-                         active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
-            >
-              <Sparkles className="w-4 h-4" />
-              Clean Up Photo ✨
-            </button>
-          </div>
+          {/* Clean Up Photo button — hidden once bg has been removed */}
+          {!(localBgRemoved || item.bgRemoved) && (
+            <div className="px-4 py-3 bg-white border-t border-black/10">
+              <button
+                onClick={() => setShowBgRemoval(true)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
+                           border-2 border-black bg-white font-display font-bold text-sm uppercase
+                           shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]
+                           active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
+              >
+                <Sparkles className="w-4 h-4" />
+                Clean Up Photo ✨
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -442,12 +448,19 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
         <BgRemovalSheet
           imageObjectPath={displayImagePath ?? item.imageObjectPath}
           itemName={item.name}
-          onSaved={(chosenUrl) => {
-            // Update the photo on screen immediately — no waiting for DB.
+          onSaved={(chosenUrl, wasCleaned) => {
+            // Update photo + cleaned flag on screen immediately — no waiting for DB.
             setDisplayImagePath(chosenUrl);
+            if (wasCleaned) setLocalBgRemoved(true);
             // Fire the DB write in the background.
             updateItem.mutate(
-              { id: item.id, data: { imageObjectPath: chosenUrl } },
+              {
+                id: item.id,
+                data: {
+                  imageObjectPath: chosenUrl,
+                  ...(wasCleaned && { bgRemoved: true }),
+                },
+              },
               {
                 onSuccess: () => {
                   queryClient.invalidateQueries({ queryKey: getListClothingQueryKey() });
