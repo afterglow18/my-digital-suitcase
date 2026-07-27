@@ -105,8 +105,8 @@ interface Props {
 }
 
 const PHOTO_TIPS = [
-  "Photograph individual products or bundle multiple items together.",
-  "Lay everything flat on a plain background.",
+  "Photograph complete outfits together or individual items separately.",
+  "Lay items flat on a plain background.",
   "Take the photo from directly above.",
   "Keep all items fully in frame.",
 ] as const;
