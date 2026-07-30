@@ -57,7 +57,7 @@ export default function WelcomePage({ onEnter }: Props) {
   };
 
   const isOpen   = phase === "exiting";
-  const isReveal = phase === "exiting";
+  const isReveal = false; // never re-show hero image on exit — root fades straight to app
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Shared branding block — rendered differently per phase (see below)
