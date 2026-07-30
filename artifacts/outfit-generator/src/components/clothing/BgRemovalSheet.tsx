@@ -16,7 +16,7 @@ import { X, Check, Loader2 } from "lucide-react";
 import { removeBackground } from "@/lib/backgroundRemoval";
 import { getImageUrl } from "@/lib/utils";
 
-const PINK = "#e8609a";
+const ACCENT = "black";
 
 interface Props {
   /** The stored data-URL (or path) of the current item image. */
@@ -122,7 +122,7 @@ export function BgRemovalSheet({ imageObjectPath, itemName, onSaved, onClose }: 
               onClick={() => pick("original")}
               className="flex-1 overflow-hidden rounded-2xl transition-all"
               style={{
-                border: selected === "original" ? `4px solid ${PINK}` : "4px solid rgba(0,0,0,0.15)",
+                border: selected === "original" ? `4px solid ${ACCENT}` : "4px solid rgba(0,0,0,0.15)",
                 opacity: selected === "original" ? 1 : 0.55,
                 background: "none",
                 padding: 0,
@@ -137,7 +137,7 @@ export function BgRemovalSheet({ imageObjectPath, itemName, onSaved, onClose }: 
                 {selected === "original" && (
                   <div style={{
                     position: "absolute", top: 8, right: 8,
-                    width: 24, height: 24, borderRadius: "50%", background: PINK,
+                    width: 24, height: 24, borderRadius: "50%", background: ACCENT,
                     display: "flex", alignItems: "center", justifyContent: "center",
                     boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
                   }}>
@@ -155,7 +155,7 @@ export function BgRemovalSheet({ imageObjectPath, itemName, onSaved, onClose }: 
               onClick={() => cleanState !== "error" && pick("cleaned")}
               className="flex-1 overflow-hidden rounded-2xl transition-all"
               style={{
-                border: selected === "cleaned" ? `4px solid ${PINK}` : "4px solid rgba(0,0,0,0.15)",
+                border: selected === "cleaned" ? `4px solid ${ACCENT}` : "4px solid rgba(0,0,0,0.15)",
                 opacity: selected === "cleaned" ? 1 : (cleanState === "error" ? 0.35 : 0.55),
                 background: "none",
                 padding: 0,
@@ -199,7 +199,7 @@ export function BgRemovalSheet({ imageObjectPath, itemName, onSaved, onClose }: 
                 {selected === "cleaned" && cleanState === "done" && (
                   <div style={{
                     position: "absolute", top: 8, right: 8,
-                    width: 24, height: 24, borderRadius: "50%", background: PINK,
+                    width: 24, height: 24, borderRadius: "50%", background: ACCENT,
                     display: "flex", alignItems: "center", justifyContent: "center",
                     boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
                   }}>
@@ -221,8 +221,8 @@ export function BgRemovalSheet({ imageObjectPath, itemName, onSaved, onClose }: 
                        border-4 border-black rounded-xl font-display font-bold text-sm uppercase
                        shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]
                        active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all
-                       disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed"
-            style={{ background: saveDisabled ? "#ccc" : PINK, color: "white" }}
+                       disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed
+                       bg-primary text-primary-foreground"
           >
             {saveDisabled
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Still cleaning…</>

@@ -129,6 +129,7 @@ export function QuickAddSheet({ open, onOpenChange, category, existingCount, onC
   const [bgFailed,     setBgFailed]     = useState(false);
   const [selected,     setSelected]     = useState<"original" | "cleaned">("original");
   const [progress,     setProgress]     = useState<{ current: number; total: number } | null>(null);
+  const [fileQueue,    setFileQueue]    = useState<File[]>([]);
 
   // Each photo bumps this counter. Every async step checks it before writing state —
   // prevents a slow first photo from clobbering a fast second one.
@@ -152,6 +153,7 @@ export function QuickAddSheet({ open, onOpenChange, category, existingCount, onC
     setCleanedUrl(null);
     setBgFailed(false);
     setSelected("original");
+    setFileQueue([]);
     onOpenChange(false);
   }, [onOpenChange]);
 
@@ -242,12 +244,19 @@ export function QuickAddSheet({ open, onOpenChange, category, existingCount, onC
         );
       });
 
-      handleClose();
+      if (fileQueue.length > 0) {
+        // More files queued — load the next one instead of closing
+        const [next, ...rest] = fileQueue;
+        setFileQueue(rest);
+        handleFile(next);
+      } else {
+        handleClose();
+      }
     } catch (err) {
       setErrorMsg(`Save failed: ${err instanceof Error ? err.message : String(err)}`);
       setPhase("preview");
     }
-  }, [selected, cleanedBlob, originalBlob, category, existingCount, createItem, queryClient, onCreated, handleClose]);
+  }, [selected, cleanedBlob, originalBlob, category, existingCount, createItem, queryClient, onCreated, handleClose, fileQueue, handleFile]);
 
   // ── Batch save (multiple files, no comparison UI) ────────────────────────
   const saveOneFile = useCallback(async (file: File, itemIndex: number): Promise<boolean> => {
@@ -299,11 +308,10 @@ export function QuickAddSheet({ open, onOpenChange, category, existingCount, onC
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
     if (!files.length) return;
-    if (files.length === 1) {
-      handleFile(files[0]);   // single → comparison UI
-    } else {
-      handleFiles(files);     // multiple → batch upload
-    }
+    // Always route through the comparison UI, one photo at a time.
+    // Remaining files are queued and loaded automatically after each save.
+    setFileQueue(files.slice(1));
+    handleFile(files[0]);
   };
 
   if (!open) return null;
