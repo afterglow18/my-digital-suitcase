@@ -557,7 +557,7 @@ export function QuickAddSheet({ open, onOpenChange, category, existingCount, onC
                            active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
               >
                 <Check className="w-4 h-4" strokeWidth={3} />
-                {bgProcessing ? "Save Original" : "Save to Closet"}
+                {bgProcessing ? "Save Original" : "Save to Suitcase"}
               </button>
             </div>
           </div>
