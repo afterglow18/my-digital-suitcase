@@ -77,8 +77,8 @@ type Phase  = "idle" | "spinning" | "result";
 const ROWS: { key: RowKey }[] = [
   { key: "outfits"    },
   { key: "beauty"     },
-  { key: "souvenirs" },
   { key: "essentials" },
+  { key: "souvenirs"  },
 ];
 
 const MIN_SPIN_MS = 1600;
@@ -162,7 +162,7 @@ export default function GeneratePage() {
           const landMap: Partial<Record<RowKey, { item: ClothingItem; idx: number }>> = {};
           data.items.forEach(apiItem => {
             const key = apiItem.category as RowKey;
-            if (!["outfits", "beauty", "souvenirs", "essentials"].includes(key)) return;
+            if (!["outfits", "beauty", "essentials", "souvenirs"].includes(key)) return;
             const arr = rowDataRef.current[key];
             const localIdx = arr.findIndex(i => i.id === apiItem.id);
             landMap[key] = { item: apiItem, idx: localIdx >= 0 ? localIdx : 0 };
@@ -441,7 +441,7 @@ export default function GeneratePage() {
                   fontSize: 11, color: "#9a5060",
                   marginTop: 5, lineHeight: 1.5,
                 }}>
-                  Add outfits, beauty, souvenirs or essentials in the Suitcase tab first.
+                  Add outfits, beauty, essentials or souvenirs in the Suitcase tab first.
                 </p>
               </div>
             )}

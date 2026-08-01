@@ -45,8 +45,8 @@ type Category = "outfits" | "beauty" | "souvenirs" | "essentials";
 const ROWS: { key: RowKey; btnLabel: string }[] = [
   { key: "outfits",    btnLabel: "+ ADD OUTFITS"    },
   { key: "beauty",     btnLabel: "+ ADD BEAUTY"     },
-  { key: "souvenirs", btnLabel: "+ ADD SOUVENIRS" },
   { key: "essentials", btnLabel: "+ ADD ESSENTIALS" },
+  { key: "souvenirs",  btnLabel: "+ ADD SOUVENIRS"  },
 ];
 
 // ── Image constants ───────────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ export default function WardrobePage() {
     setCentred(prev => {
       const next = { ...prev };
       let changed = false;
-      (["outfits", "beauty", "souvenirs", "essentials"] as RowKey[]).forEach(key => {
+      (["outfits", "beauty", "essentials", "souvenirs"] as RowKey[]).forEach(key => {
         if (rowData[key].length === 0 && next[key] !== undefined) {
           delete next[key]; changed = true;
         }

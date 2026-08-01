@@ -7,7 +7,7 @@
 
 import { getDB, type ClothingItem, type SavedOutfit, type StoredClothingItem, type StoredOutfit, type StoredOutfitItem } from "./db";
 
-const CATEGORIES = ["outfits", "beauty", "souvenirs", "essentials"] as const;
+const CATEGORIES = ["outfits", "beauty", "essentials", "souvenirs"] as const;
 
 // ── Clothing items ────────────────────────────────────────────────────────────
 

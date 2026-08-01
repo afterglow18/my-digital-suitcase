@@ -171,7 +171,7 @@ export function WardrobePickerSheet({ open, onOpenChange, category, onPick, exis
                 Choose a category
               </p>
               <div className="grid grid-cols-2 gap-2">
-                {(["outfits", "beauty", "souvenirs", "essentials"] as Category[]).map((cat) => (
+                {(["outfits", "beauty", "essentials", "souvenirs"] as Category[]).map((cat) => (
                   <button
                     key={cat}
                     onClick={() => {
