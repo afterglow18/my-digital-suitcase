@@ -71,13 +71,13 @@ const pX = (ir: ImgRect, f: number) => ir.left   + ir.width  * f;
 const pY = (ir: ImgRect, f: number) => ir.top    + ir.height * f;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type RowKey = "outfits" | "beauty" | "toiletries" | "essentials";
+type RowKey = "outfits" | "beauty" | "souvenirs" | "essentials";
 type Phase  = "idle" | "spinning" | "result";
 
 const ROWS: { key: RowKey }[] = [
   { key: "outfits"    },
   { key: "beauty"     },
-  { key: "toiletries" },
+  { key: "souvenirs" },
   { key: "essentials" },
 ];
 
@@ -92,7 +92,7 @@ export default function GeneratePage() {
   const rowRefs: Record<RowKey, RefObject<ClosetRowHandle | null>> = {
     outfits:    useRef<ClosetRowHandle | null>(null),
     beauty:     useRef<ClosetRowHandle | null>(null),
-    toiletries: useRef<ClosetRowHandle | null>(null),
+    souvenirs: useRef<ClosetRowHandle | null>(null),
     essentials: useRef<ClosetRowHandle | null>(null),
   };
 
@@ -102,22 +102,22 @@ export default function GeneratePage() {
   const [saveName,   setSaveName]   = useState("");
 
   const rowDataRef = useRef<Record<RowKey, ClothingItem[]>>({
-    outfits: [], beauty: [], toiletries: [], essentials: [],
+    outfits: [], beauty: [], souvenirs: [], essentials: [],
   });
 
   const { data: outfits    = [] } = useListClothing({ category: "outfits"    }, { query: { queryKey: getListClothingQueryKey({ category: "outfits"    }) } });
   const { data: beauty     = [] } = useListClothing({ category: "beauty"     }, { query: { queryKey: getListClothingQueryKey({ category: "beauty"     }) } });
-  const { data: toiletries = [] } = useListClothing({ category: "toiletries" }, { query: { queryKey: getListClothingQueryKey({ category: "toiletries" }) } });
+  const { data: souvenirs = [] } = useListClothing({ category: "souvenirs" }, { query: { queryKey: getListClothingQueryKey({ category: "souvenirs" }) } });
   const { data: essentials = [] } = useListClothing({ category: "essentials" }, { query: { queryKey: getListClothingQueryKey({ category: "essentials" }) } });
 
-  useEffect(() => { rowDataRef.current = { outfits, beauty, toiletries, essentials }; }, [outfits, beauty, toiletries, essentials]);
+  useEffect(() => { rowDataRef.current = { outfits, beauty, souvenirs, essentials }; }, [outfits, beauty, souvenirs, essentials]);
 
-  const hasItems = outfits.length > 0 || beauty.length > 0 || toiletries.length > 0 || essentials.length > 0;
+  const hasItems = outfits.length > 0 || beauty.length > 0 || souvenirs.length > 0 || essentials.length > 0;
 
   const setCentredHandlers: Record<RowKey, (item: ClothingItem | null) => void> = {
     outfits:    useCallback((item: ClothingItem | null) => setCentred(p => ({ ...p, outfits:    item ?? undefined })), []),
     beauty:     useCallback((item: ClothingItem | null) => setCentred(p => ({ ...p, beauty:     item ?? undefined })), []),
-    toiletries: useCallback((item: ClothingItem | null) => setCentred(p => ({ ...p, toiletries: item ?? undefined })), []),
+    souvenirs: useCallback((item: ClothingItem | null) => setCentred(p => ({ ...p, souvenirs: item ?? undefined })), []),
     essentials: useCallback((item: ClothingItem | null) => setCentred(p => ({ ...p, essentials: item ?? undefined })), []),
   };
 
@@ -137,7 +137,7 @@ export default function GeneratePage() {
     setSaveName("");
 
     const spinStart = Date.now();
-    const stop: Record<RowKey, boolean> = { outfits: false, beauty: false, toiletries: false, essentials: false };
+    const stop: Record<RowKey, boolean> = { outfits: false, beauty: false, souvenirs: false, essentials: false };
 
     ROWS.forEach(({ key }, ri) => {
       const INTERVAL = 65 + ri * 18;
@@ -162,7 +162,7 @@ export default function GeneratePage() {
           const landMap: Partial<Record<RowKey, { item: ClothingItem; idx: number }>> = {};
           data.items.forEach(apiItem => {
             const key = apiItem.category as RowKey;
-            if (!["outfits", "beauty", "toiletries", "essentials"].includes(key)) return;
+            if (!["outfits", "beauty", "souvenirs", "essentials"].includes(key)) return;
             const arr = rowDataRef.current[key];
             const localIdx = arr.findIndex(i => i.id === apiItem.id);
             landMap[key] = { item: apiItem, idx: localIdx >= 0 ? localIdx : 0 };
@@ -306,7 +306,7 @@ export default function GeneratePage() {
             {/* ── 4 shelf carousels + ADD-button covers ── */}
             {ROWS.map(({ key }, rowIdx) => {
               const lm    = LM.rows[rowIdx];
-              const items = { outfits, beauty, toiletries, essentials }[key];
+              const items = { outfits, beauty, souvenirs, essentials }[key];
               const secTop = pY(ir, lm.sectionTop);
               const secH   = pH(ir, lm.shelfY - lm.sectionTop);
               const btnCY  = pY(ir, lm.btnCY);
@@ -441,7 +441,7 @@ export default function GeneratePage() {
                   fontSize: 11, color: "#9a5060",
                   marginTop: 5, lineHeight: 1.5,
                 }}>
-                  Add outfits, beauty, toiletries or essentials in the Suitcase tab first.
+                  Add outfits, beauty, souvenirs or essentials in the Suitcase tab first.
                 </p>
               </div>
             )}

@@ -18,13 +18,13 @@ import { FREE_OUTFIT_LIMIT } from "@/lib/entitlements";
 import { WardrobePickerSheet } from "@/components/clothing/WardrobePickerSheet";
 import { ItemDetailsSheet } from "@/components/clothing/ItemDetailsSheet";
 
-const SLOT_ORDER = ["outfits", "beauty", "toiletries", "essentials"] as const;
+const SLOT_ORDER = ["outfits", "beauty", "souvenirs", "essentials"] as const;
 type SlotKey = (typeof SLOT_ORDER)[number];
 
 const SLOT_LABELS: Record<SlotKey, string> = {
   outfits:    "Outfits",
   beauty:     "Beauty",
-  toiletries: "Toiletries",
+  souvenirs: "Souvenirs",
   essentials: "Essentials",
 };
 
@@ -314,7 +314,7 @@ export default function SavedPage() {
                   )}
                 </div>
 
-                {/* 4-slot grid: outfits / beauty / toiletries / essentials */}
+                {/* 4-slot grid: outfits / beauty / souvenirs / essentials */}
                 <div className="p-3">
                   <div className="grid grid-cols-4 gap-2">
                     {SLOT_ORDER.map((slot) => {

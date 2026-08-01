@@ -37,7 +37,7 @@ import { CSS } from "@dnd-kit/utilities";
 const CATEGORY_LABELS: Record<string, string> = {
   outfits:    "Outfits",
   beauty:     "Beauty",
-  toiletries: "Toiletries",
+  souvenirs: "Souvenirs",
   essentials: "Essentials",
 };
 

@@ -18,12 +18,12 @@ import { getImageUrl } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { QuickAddSheet } from "./QuickAddSheet";
 
-type Category = "outfits" | "beauty" | "toiletries" | "essentials";
+type Category = "outfits" | "beauty" | "souvenirs" | "essentials";
 
 const CATEGORY_LABELS: Record<Category, string> = {
   outfits:    "Outfits",
   beauty:     "Beauty",
-  toiletries: "Toiletries",
+  souvenirs: "Souvenirs",
   essentials: "Essentials",
 };
 
@@ -171,7 +171,7 @@ export function WardrobePickerSheet({ open, onOpenChange, category, onPick, exis
                 Choose a category
               </p>
               <div className="grid grid-cols-2 gap-2">
-                {(["outfits", "beauty", "toiletries", "essentials"] as Category[]).map((cat) => (
+                {(["outfits", "beauty", "souvenirs", "essentials"] as Category[]).map((cat) => (
                   <button
                     key={cat}
                     onClick={() => {

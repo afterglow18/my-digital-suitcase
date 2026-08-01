@@ -26,12 +26,12 @@ import type { ClothingItem } from "@/lib/db";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type Category = "outfits" | "beauty" | "toiletries" | "essentials";
+type Category = "outfits" | "beauty" | "souvenirs" | "essentials";
 
 const CATEGORY_LABELS: Record<Category, string> = {
   outfits:    "Outfits",
   beauty:     "Beauty",
-  toiletries: "Toiletries",
+  souvenirs: "Souvenirs",
   essentials: "Essentials",
 };
 
@@ -114,7 +114,7 @@ const PHOTO_TIPS = [
 const CATEGORY_EXAMPLES: Record<string, { emoji: string; items: string[] }> = {
   outfits:    { emoji: "👗", items: ["Tops", "Bottoms", "Shoes", "Swim", "Undergarments", "Dresses", "Accessories"] },
   beauty:     { emoji: "💄", items: ["Makeup", "Skincare", "Hair", "Jewelry", "Nail Polish"] },
-  toiletries: { emoji: "🪥", items: ["Shower", "Dental", "Medicine", "Feminine Care", "First Aid"] },
+  souvenirs: { emoji: "🎁", items: ["Magnets", "Keychains", "Postcards", "Local Crafts", "Snow Globes"] },
   essentials: { emoji: "🧳", items: ["Travel Docs", "Tech", "Snacks", "Books", "Accessories"] },
 };
 

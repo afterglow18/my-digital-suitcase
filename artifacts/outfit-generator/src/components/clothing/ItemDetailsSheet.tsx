@@ -25,7 +25,7 @@ import { getImageUrl } from "@/lib/utils";
 
 const SEASON_OPTIONS    = ["", "Spring", "Summer", "Fall", "Winter", "All Season"];
 const OCCASION_OPTIONS  = ["", "Casual", "Work", "Formal", "Sport", "Special Event"];
-const CATEGORY_OPTIONS  = ["outfits", "beauty", "toiletries", "essentials"];
+const CATEGORY_OPTIONS  = ["outfits", "beauty", "souvenirs", "essentials"];
 
 function Field({
   label,
