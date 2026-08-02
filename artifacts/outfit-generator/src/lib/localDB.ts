@@ -9,23 +9,50 @@ import { getDB, type ClothingItem, type SavedOutfit, type StoredClothingItem, ty
 
 const CATEGORIES = ["outfits", "beauty", "essentials", "souvenirs"] as const;
 
+// ── Helper: normalise a raw DB record into a ClothingItem with safe defaults ──
+
+function normalise(raw: StoredClothingItem & { id: number }): ClothingItem {
+  return {
+    id:              raw.id,
+    name:            raw.name            ?? "",
+    category:        raw.category        ?? "",
+    imageObjectPath: raw.imageObjectPath ?? null,
+    isFavorite:      raw.isFavorite      ?? false,
+    timesWorn:       raw.timesWorn       ?? 0,
+    bgRemoved:       raw.bgRemoved       ?? false,
+    color:           raw.color           ?? null,
+    brand:           raw.brand           ?? null,
+    size:            raw.size            ?? null,
+    season:          raw.season          ?? null,
+    occasion:        raw.occasion        ?? null,
+    purchasePrice:   raw.purchasePrice   ?? null,
+    purchaseDate:    raw.purchaseDate    ?? null,
+    notes:           raw.notes           ?? null,
+    createdAt:       raw.createdAt,
+    updatedAt:       raw.updatedAt,
+    visionLabels:    raw.visionLabels    ?? [],
+    visionText:      raw.visionText      ?? [],
+    visionVersion:   raw.visionVersion   ?? 0,
+  };
+}
+
 // ── Clothing items ────────────────────────────────────────────────────────────
 
 export async function listClothing(category?: string): Promise<ClothingItem[]> {
-  const db   = await getDB();
-  const all  = category
+  const db  = await getDB();
+  const all = category
     ? await db.getAllFromIndex("clothing_items", "by_category", category)
     : await db.getAll("clothing_items");
 
-  return (all as ClothingItem[]).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  return (all as (StoredClothingItem & { id: number })[])
+    .map(normalise)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export async function getClothingItem(id: number): Promise<ClothingItem | null> {
-  const db   = await getDB();
-  const item = await db.get("clothing_items", id);
-  return (item as ClothingItem) ?? null;
+  const db  = await getDB();
+  const raw = await db.get("clothing_items", id);
+  return raw ? normalise(raw as StoredClothingItem & { id: number }) : null;
 }
 
 export async function createClothingItem(data: {
@@ -51,20 +78,23 @@ export async function createClothingItem(data: {
     isFavorite:     false,
     timesWorn:      0,
     bgRemoved:      false,
-    color:          data.color ?? null,
-    brand:          data.brand ?? null,
-    size:           data.size  ?? null,
-    season:         data.season ?? null,
-    occasion:       data.occasion ?? null,
+    color:          data.color         ?? null,
+    brand:          data.brand         ?? null,
+    size:           data.size          ?? null,
+    season:         data.season        ?? null,
+    occasion:       data.occasion      ?? null,
     purchasePrice:  data.purchasePrice ?? null,
     purchaseDate:   data.purchaseDate  ?? null,
-    notes:          data.notes ?? null,
+    notes:          data.notes         ?? null,
     createdAt:      now,
     updatedAt:      now,
+    visionLabels:   [],
+    visionText:     [],
+    visionVersion:  0,
   };
 
   const id = await db.add("clothing_items", record);
-  return { ...record, id: id as number } as ClothingItem;
+  return normalise({ ...record, id: id as number });
 }
 
 export async function updateClothingItem(
@@ -83,14 +113,32 @@ export async function updateClothingItem(
   };
 
   await db.put("clothing_items", updated);
-  return updated as ClothingItem;
+  return normalise(updated as StoredClothingItem & { id: number });
+}
+
+/** Update only the vision analysis fields — lightweight, no updatedAt bump. */
+export async function updateVisionData(
+  id: number,
+  labels: string[],
+  text: string[],
+  version: number,
+): Promise<void> {
+  const db       = await getDB();
+  const existing = await db.get("clothing_items", id) as StoredClothingItem | undefined;
+  if (!existing) return; // item may have been deleted
+  await db.put("clothing_items", {
+    ...existing,
+    id,
+    visionLabels:  labels,
+    visionText:    text,
+    visionVersion: version,
+  });
 }
 
 export async function deleteClothingItem(id: number): Promise<void> {
   const db = await getDB();
   await db.delete("clothing_items", id);
 
-  // Remove from any outfits
   const links = await db.getAllFromIndex("outfit_items", "by_item", id);
   const tx    = db.transaction("outfit_items", "readwrite");
   for (const link of links) {
@@ -123,14 +171,14 @@ export async function getWardrobeStats() {
 
 export async function generateOutfit(excludeCategories: string[] = []): Promise<ClothingItem[]> {
   const db          = await getDB();
-  const all         = (await db.getAll("clothing_items")) as ClothingItem[];
+  const all         = (await db.getAll("clothing_items")) as (StoredClothingItem & { id: number })[];
   const active      = CATEGORIES.filter((c) => !excludeCategories.includes(c));
   const picked: ClothingItem[] = [];
 
   for (const cat of active) {
     const items = all.filter((i) => i.category === cat);
     if (items.length > 0) {
-      picked.push(items[Math.floor(Math.random() * items.length)]);
+      picked.push(normalise(items[Math.floor(Math.random() * items.length)]));
     }
   }
 
@@ -147,7 +195,7 @@ async function hydrateOutfit(outfit: StoredOutfit & { id: number }): Promise<Sav
   const db    = await getDB();
   const links = (await db.getAllFromIndex("outfit_items", "by_outfit", outfit.id)) as StoredOutfitItem[];
 
-  const items = await Promise.all(
+  const raws = await Promise.all(
     links.map((l) => db.get("clothing_items", l.clothingItemId))
   );
 
@@ -156,7 +204,9 @@ async function hydrateOutfit(outfit: StoredOutfit & { id: number }): Promise<Sav
     name:      outfit.name,
     notes:     outfit.notes ?? null,
     createdAt: outfit.createdAt,
-    items:     items.filter(Boolean) as ClothingItem[],
+    items:     raws
+      .filter(Boolean)
+      .map((r) => normalise(r as StoredClothingItem & { id: number })),
   };
 }
 
@@ -209,7 +259,6 @@ export async function addItemToOutfit(outfitId: number, itemId: number): Promise
   const db    = await getDB();
   const links = (await db.getAllFromIndex("outfit_items", "by_outfit", outfitId)) as StoredOutfitItem[];
 
-  // Prevent duplicates in the same outfit
   if (links.some((l) => l.clothingItemId === itemId)) return;
 
   const link: StoredOutfitItem = { outfitId, clothingItemId: itemId };

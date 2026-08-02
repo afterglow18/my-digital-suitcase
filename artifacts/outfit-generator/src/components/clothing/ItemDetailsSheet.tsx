@@ -1,14 +1,20 @@
 /**
  * ItemDetailsSheet — full-screen overlay showing a clothing item's details.
- * Every field is optional and editable. A "Save" button appears only when
- * the form is dirty. Delete is always available.
+ *
+ * Props:
+ *   showAddToLookbook (default false)
+ *     true  → image-area action buttons: [Wearing Today] + [Add to Lookbook]
+ *     false → image-area action buttons: [Wearing Today] + [Clean Up Photo ✨]
+ *
+ * The footer always contains Save Changes (when dirty) and Delete.
  */
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  X, Heart, Trash2, Save, ChevronDown, Sparkles,
+  X, Heart, Trash2, Save, ChevronDown, Sparkles, BookMarked, Shirt,
 } from "lucide-react";
 import { BgRemovalSheet } from "./BgRemovalSheet";
+import { AddToLookbookSheet } from "./AddToLookbookSheet";
 import {
   type ClothingItem,
   type ClothingItemUpdateCategory,
@@ -100,6 +106,8 @@ interface ItemDetailsSheetProps {
   item: ClothingItem | null;
   onClose: () => void;
   onDeleted?: () => void;
+  /** When true: show Add to Lookbook instead of Clean Up Photo. Default false. */
+  showAddToLookbook?: boolean;
 }
 
 interface FormState {
@@ -148,22 +156,24 @@ function isDirty(form: FormState, item: ClothingItem): boolean {
   );
 }
 
-export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetProps) {
+export function ItemDetailsSheet({
+  item,
+  onClose,
+  onDeleted,
+  showAddToLookbook = false,
+}: ItemDetailsSheetProps) {
   const [form, setForm]                   = useState<FormState | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showBgRemoval, setShowBgRemoval] = useState(false);
-  // Optimistic image — updated immediately when user confirms in BgRemovalSheet
-  // so the photo on screen changes before the DB write finishes.
+  const [showLookbookPicker, setShowLookbookPicker] = useState(false);
   const [displayImagePath,  setDisplayImagePath]  = useState<string | null>(null);
-  // Optimistic bgRemoved — set true immediately when the user confirms a clean
-  // so the button disappears before the DB write completes.
   const [localBgRemoved, setLocalBgRemoved] = useState(false);
+  const [wearingLogged, setWearingLogged]   = useState(false);
 
   const updateItem  = useUpdateClothingItem();
   const deleteItem  = useDeleteClothingItem();
   const queryClient = useQueryClient();
 
-  // Reset form + image state whenever item changes
   useEffect(() => {
     if (item) {
       setForm(toForm(item));
@@ -172,6 +182,8 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
     }
     setShowDeleteConfirm(false);
     setShowBgRemoval(false);
+    setShowLookbookPicker(false);
+    setWearingLogged(false);
   }, [item?.id]);
 
   if (!item || !form) return null;
@@ -186,8 +198,6 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
       {
         id: item.id,
         data: {
-          // Always send every editable field so the backend can clear it when empty.
-          // Backend converts "" → null in DB.
           name:          form.name.trim() || item.name,
           brand:         form.brand.trim(),
           color:         form.color.trim(),
@@ -227,6 +237,23 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
     );
   };
 
+  const handleWearingToday = () => {
+    if (wearingLogged) return;
+    setWearingLogged(true);
+    updateItem.mutate(
+      { id: item.id, data: { timesWorn: (item.timesWorn ?? 0) + 1 } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListClothingQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListOutfitsQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getWardrobeStatsQueryKey() });
+        },
+      },
+    );
+    // Reset the "logged" feedback after 2 s
+    setTimeout(() => setWearingLogged(false), 2000);
+  };
+
   return (
     <>
     <motion.div
@@ -244,7 +271,7 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
           Item Details
         </h2>
         <div className="flex items-center gap-2">
-          {/* Favourite toggle — saves instantly */}
+          {/* Favourite toggle */}
           <button
             onClick={() => {
               const next = !form.isFavorite;
@@ -294,64 +321,110 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
               backgroundSize: "16px 16px",
             }}
           >
-            {/* displayImagePath is updated optimistically before the DB write finishes */}
             <img
               src={getImageUrl(displayImagePath ?? item.imageObjectPath)!}
               alt={item.name}
               className="w-full h-full object-contain"
             />
           </div>
-          {/* Clean Up Photo button — hidden once bg has been removed */}
-          {!(localBgRemoved || item.bgRemoved) && (
-            <div className="px-4 py-3 bg-white border-t border-black/10">
+
+          {/* Action buttons below photo — always 2 */}
+          <div className="px-4 py-3 bg-white border-t border-black/10 grid grid-cols-2 gap-2">
+            {/* Button 1 — always: Wearing Today */}
+            <button
+              onClick={handleWearingToday}
+              disabled={wearingLogged}
+              className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl
+                          border-2 border-black font-display font-bold text-xs uppercase
+                          shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]
+                          active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all
+                          ${wearingLogged ? "bg-green-100 border-green-600 text-green-700" : "bg-white"}`}
+            >
+              <Shirt className="w-3.5 h-3.5" />
+              {wearingLogged ? "Logged ✓" : "Wearing Today"}
+            </button>
+
+            {/* Button 2 — context-aware */}
+            {showAddToLookbook ? (
               <button
-                onClick={() => setShowBgRemoval(true)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
-                           border-2 border-black bg-white font-display font-bold text-sm uppercase
-                           shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]
+                onClick={() => setShowLookbookPicker(true)}
+                className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl
+                           border-2 border-black bg-white font-display font-bold text-xs uppercase
+                           shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]
                            active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
               >
-                <Sparkles className="w-4 h-4" />
-                Clean Up Photo ✨
+                <BookMarked className="w-3.5 h-3.5" />
+                Add to Lookbook
               </button>
-            </div>
+            ) : (
+              !(localBgRemoved || item.bgRemoved) && (
+                <button
+                  onClick={() => setShowBgRemoval(true)}
+                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl
+                             border-2 border-black bg-white font-display font-bold text-xs uppercase
+                             shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]
+                             active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Clean Up Photo
+                </button>
+              )
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* No image — still show action buttons */}
+      {!item.imageObjectPath && (
+        <div className="px-4 py-3 bg-white border-b-2 border-black grid grid-cols-2 gap-2">
+          <button
+            onClick={handleWearingToday}
+            disabled={wearingLogged}
+            className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl
+                        border-2 border-black font-display font-bold text-xs uppercase
+                        shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]
+                        active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all
+                        ${wearingLogged ? "bg-green-100 border-green-600 text-green-700" : "bg-white"}`}
+          >
+            <Shirt className="w-3.5 h-3.5" />
+            {wearingLogged ? "Logged ✓" : "Wearing Today"}
+          </button>
+          {showAddToLookbook && (
+            <button
+              onClick={() => setShowLookbookPicker(true)}
+              className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl
+                         border-2 border-black bg-white font-display font-bold text-xs uppercase
+                         shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]
+                         active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
+            >
+              <BookMarked className="w-3.5 h-3.5" />
+              Add to Lookbook
+            </button>
           )}
         </div>
       )}
 
       {/* ── Form ── */}
       <div className="flex-1 px-4 py-5 flex flex-col gap-4">
-
-        {/* Name */}
         <Field
           label="Item Name"
           value={form.name}
           onChange={patch("name") as (v: string) => void}
           placeholder="e.g. White Linen Shirt"
         />
-
-        {/* Brand + Color */}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Brand"  value={form.brand} onChange={patch("brand") as (v: string) => void} placeholder="Nike, Zara…" />
           <Field label="Color"  value={form.color} onChange={patch("color") as (v: string) => void} placeholder="Navy Blue" />
         </div>
-
-        {/* Size */}
         <Field label="Size / Volume" value={form.size} onChange={patch("size") as (v: string) => void} placeholder="30ml, 50ml, Full Size…" />
-
-        {/* Season + Occasion */}
         <div className="grid grid-cols-2 gap-3">
           <SelectField label="Season"   value={form.season}   onChange={patch("season") as (v: string) => void}   options={SEASON_OPTIONS} />
           <SelectField label="Occasion" value={form.occasion} onChange={patch("occasion") as (v: string) => void} options={OCCASION_OPTIONS} />
         </div>
-
-        {/* Price + Date */}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Purchase Price" value={form.purchasePrice} onChange={patch("purchasePrice") as (v: string) => void} placeholder="$49.99" />
           <Field label="Purchase Date"  value={form.purchaseDate}  onChange={patch("purchaseDate") as (v: string) => void}  type="date" />
         </div>
-
-        {/* Notes */}
         <div className="flex flex-col gap-1">
           <label className="text-[10px] font-bold uppercase tracking-widest text-black/40">
             Notes
@@ -366,8 +439,6 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
                        placeholder:font-normal placeholder:text-black/25"
           />
         </div>
-
-        {/* Category (editable) + Times Worn (read-only) */}
         <div className="grid grid-cols-2 gap-3">
           <SelectField
             label="Category"
@@ -382,13 +453,10 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
             </div>
           </div>
         </div>
-
       </div>
 
       {/* ── Footer actions ── */}
       <div className="sticky bottom-0 px-4 py-4 bg-white border-t-2 border-black flex-shrink-0 flex flex-col gap-2">
-
-        {/* Save (only when dirty) */}
         <AnimatePresence>
           {dirty && (
             <motion.button
@@ -405,7 +473,6 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
           )}
         </AnimatePresence>
 
-        {/* Delete */}
         {!showDeleteConfirm ? (
           <button
             onClick={() => setShowDeleteConfirm(true)}
@@ -449,10 +516,8 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
           imageObjectPath={displayImagePath ?? item.imageObjectPath}
           itemName={item.name}
           onSaved={(chosenUrl, wasCleaned) => {
-            // Update photo + cleaned flag on screen immediately — no waiting for DB.
             setDisplayImagePath(chosenUrl);
             if (wasCleaned) setLocalBgRemoved(true);
-            // Fire the DB write in the background.
             updateItem.mutate(
               {
                 id: item.id,
@@ -471,6 +536,16 @@ export function ItemDetailsSheet({ item, onClose, onDeleted }: ItemDetailsSheetP
             );
           }}
           onClose={() => setShowBgRemoval(false)}
+        />
+      )}
+    </AnimatePresence>
+
+    {/* ── Add to Lookbook overlay ── */}
+    <AnimatePresence>
+      {showLookbookPicker && (
+        <AddToLookbookSheet
+          item={item}
+          onClose={() => setShowLookbookPicker(false)}
         />
       )}
     </AnimatePresence>

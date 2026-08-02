@@ -22,6 +22,7 @@ import {
   addItemToOutfit,
   removeItemFromOutfit,
 } from "@/lib/localDB";
+import { searchEverything, type SearchResults } from "@/lib/search";
 
 export type { ClothingItem, SavedOutfit } from "@/lib/db";
 import type { ClothingItem, SavedOutfit } from "@/lib/db";
@@ -171,6 +172,17 @@ export function useAddItemToOutfit() {
 export function useRemoveItemFromOutfit() {
   return useMutation<void, Error, { id: number; itemId: number }>({
     mutationFn: ({ id, itemId }) => removeItemFromOutfit(id, itemId),
+  });
+}
+
+// ── Search hook ───────────────────────────────────────────────────────────────
+
+export function useSearch(query: string) {
+  return useQuery<SearchResults, Error>({
+    queryKey: ["search", query],
+    queryFn:  () => searchEverything(query),
+    enabled:  query.trim().length > 0,
+    staleTime: 0,
   });
 }
 

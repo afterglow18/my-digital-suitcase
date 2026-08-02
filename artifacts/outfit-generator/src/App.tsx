@@ -9,6 +9,7 @@ import FavoritesPage from './pages/favorites';
 import AccountPage from './pages/account';
 import WelcomePage from './pages/welcome';
 import { queryClient } from '@/lib/queryClient';
+import { INDEXER_EVENT } from '@/lib/visionIndexer';
 
 // ── First-launch welcome ──────────────────────────────────────────────────────
 const ENTERED_KEY = "suitcase-entered";
@@ -26,6 +27,55 @@ function hasEntered(): boolean {
 
 function markEntered() {
   try { sessionStorage.setItem(ENTERED_KEY, "1"); } catch {}
+}
+
+// ── Indexing progress toast ───────────────────────────────────────────────────
+// Simple self-contained floating banner — no external toast library needed.
+
+function IndexingToast() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    let hideTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handler = (e: Event) => {
+      const { total, finished } = (
+        e as CustomEvent<{ done: number; total: number; finished: boolean }>
+      ).detail;
+
+      if (total === 0) return;
+
+      if (!finished) {
+        setVisible(true);
+        if (hideTimer) clearTimeout(hideTimer);
+      } else {
+        // Brief delay so the "ready" state is visible, then fade out
+        hideTimer = setTimeout(() => setVisible(false), 2000);
+      }
+    };
+
+    window.addEventListener(INDEXER_EVENT, handler);
+    return () => {
+      window.removeEventListener(INDEXER_EVENT, handler);
+      if (hideTimer) clearTimeout(hideTimer);
+    };
+  }, []);
+
+  if (!visible) return null;
+
+  return (
+    <div
+      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[200]
+                 px-4 py-2.5 rounded-xl border-2 border-black
+                 bg-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]
+                 font-bold text-xs uppercase tracking-wider
+                 flex items-center gap-2 pointer-events-none
+                 whitespace-nowrap"
+    >
+      <span className="w-2 h-2 rounded-full bg-black animate-pulse inline-block" />
+      Preparing photo search…
+    </div>
+  );
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -69,6 +119,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppShell />
+      <IndexingToast />
     </QueryClientProvider>
   );
 }

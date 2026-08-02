@@ -4,3 +4,4 @@
 - [Auth system](auth-system.md) — JWT/bcrypt auth, no-fallback-secret rule, ownership-before-delete pattern, single useAuth instance via context.
 - [RevenueCat seed client](revenuecat-seed-client.md) — RC connector proxy client pattern; baseUrl must be /v2; keys set as VITE_ shared env vars.
 - [pnpm + Capacitor + SPM symlink](pnpm-capacitor-spm-symlink.md) — pnpm symlinks cause Xcode SPM to silently skip plugin compilation; dereference before cap add ios.
+- [sonner in pnpm monorepo](sonner-monorepo.md) — sonner Toaster causes "invalid hook call / multiple React copies" in this pnpm monorepo; use a plain React state + window event pattern for toasts instead.

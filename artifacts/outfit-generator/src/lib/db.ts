@@ -1,42 +1,40 @@
 /**
  * Local IndexedDB database for My Digital Suitcase.
  *
- * Works in both the browser (Replit preview) and in the Capacitor iOS WebView —
- * IndexedDB is natively available in both environments and persists to the
- * app's sandboxed storage on-device.
- *
- * Schema v1:
- *   clothing_items  — wardrobe items with embedded image data URLs
- *   saved_outfits   — named outfit collections
- *   outfit_items    — junction: outfit ↔ clothing item
- *   settings        — key/value store for app preferences
+ * Schema v1: clothing_items, saved_outfits, outfit_items, settings
+ * Schema v2: adds visionLabels / visionText / visionVersion to clothing_items
+ *            (non-destructive — existing records default to [] / [] / 0)
  */
 
 import { openDB, type IDBPDatabase } from "idb";
 
 export const DB_NAME    = "my-digital-suitcase";
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 // ── Stored types (IndexedDB records) ─────────────────────────────────────────
 
 export interface StoredClothingItem {
-  id?:            number;        // auto-incremented
-  name:           string;
-  category:       string;        // "outfits" | "beauty" | "souvenirs" | "essentials"
+  id?:             number;        // auto-incremented
+  name:            string;
+  category:        string;        // "outfits" | "beauty" | "souvenirs" | "essentials"
   imageObjectPath: string | null; // JPEG data URL  (e.g. "data:image/jpeg;base64,...")
-  isFavorite:     boolean;
-  timesWorn:      number;
-  bgRemoved?:     boolean;       // true once background removal has been applied & saved
-  color?:         string | null;
-  brand?:         string | null;
-  size?:          string | null;
-  season?:        string | null;
-  occasion?:      string | null;
-  purchasePrice?: string | null;
-  purchaseDate?:  string | null;
-  notes?:         string | null;
-  createdAt:      string;
-  updatedAt:      string;
+  isFavorite:      boolean;
+  timesWorn:       number;
+  bgRemoved?:      boolean;       // true once background removal has been applied & saved
+  color?:          string | null;
+  brand?:          string | null;
+  size?:           string | null;
+  season?:         string | null;
+  occasion?:       string | null;
+  purchasePrice?:  string | null;
+  purchaseDate?:   string | null;
+  notes?:          string | null;
+  createdAt:       string;
+  updatedAt:       string;
+  // ── Vision indexing (v2) ─────────────────────────────────────────────────
+  visionLabels?:   string[];      // color/object labels from photo analysis
+  visionText?:     string[];      // text detected inside photo
+  visionVersion?:  number;        // 0=unanalyzed, 1=iOS Vision, 4=web canvas, 5=web/no labels
 }
 
 export interface StoredOutfit {
@@ -59,8 +57,28 @@ export interface StoredSetting {
 
 // ── Public types (consumed by hooks and pages) ────────────────────────────────
 
-export interface ClothingItem extends Required<StoredClothingItem> {
-  id: number;
+/** All fields are required at runtime; vision arrays default to [] / 0. */
+export interface ClothingItem {
+  id:              number;
+  name:            string;
+  category:        string;
+  imageObjectPath: string | null;
+  isFavorite:      boolean;
+  timesWorn:       number;
+  bgRemoved:       boolean;
+  color:           string | null;
+  brand:           string | null;
+  size:            string | null;
+  season:          string | null;
+  occasion:        string | null;
+  purchasePrice:   string | null;
+  purchaseDate:    string | null;
+  notes:           string | null;
+  createdAt:       string;
+  updatedAt:       string;
+  visionLabels:    string[];
+  visionText:      string[];
+  visionVersion:   number;
 }
 
 export interface SavedOutfit {
@@ -79,38 +97,37 @@ export async function getDB(): Promise<IDBPDatabase> {
   if (_db) return _db;
 
   _db = await openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      // clothing_items
-      if (!db.objectStoreNames.contains("clothing_items")) {
-        const store = db.createObjectStore("clothing_items", {
+    upgrade(db, oldVersion) {
+      // ── v1: create all stores ────────────────────────────────────────────
+      if (oldVersion < 1) {
+        const itemStore = db.createObjectStore("clothing_items", {
           keyPath:       "id",
           autoIncrement: true,
         });
-        store.createIndex("by_category", "category");
-        store.createIndex("by_favorite", "isFavorite");
-      }
+        itemStore.createIndex("by_category", "category");
+        itemStore.createIndex("by_favorite", "isFavorite");
 
-      // saved_outfits
-      if (!db.objectStoreNames.contains("saved_outfits")) {
         db.createObjectStore("saved_outfits", {
           keyPath:       "id",
           autoIncrement: true,
         });
-      }
 
-      // outfit_items
-      if (!db.objectStoreNames.contains("outfit_items")) {
-        const store = db.createObjectStore("outfit_items", {
+        const junctionStore = db.createObjectStore("outfit_items", {
           keyPath:       "id",
           autoIncrement: true,
         });
-        store.createIndex("by_outfit", "outfitId");
-        store.createIndex("by_item",   "clothingItemId");
+        junctionStore.createIndex("by_outfit", "outfitId");
+        junctionStore.createIndex("by_item",   "clothingItemId");
+
+        db.createObjectStore("settings", { keyPath: "key" });
       }
 
-      // settings
-      if (!db.objectStoreNames.contains("settings")) {
-        db.createObjectStore("settings", { keyPath: "key" });
+      // ── v2: adds visionLabels / visionText / visionVersion ───────────────
+      // No structural changes — optional fields on existing records.
+      // Existing items will read as visionVersion=0 (unanalyzed) via defaults
+      // applied in localDB read helpers.
+      if (oldVersion < 2) {
+        // Nothing to do structurally
       }
     },
 
