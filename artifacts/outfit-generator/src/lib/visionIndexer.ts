@@ -3,13 +3,14 @@
  *
  * Version scheme:
  *   0 = unanalyzed
- *   1 = indexed by iOS Vision (handled natively, not touched here)
- *   4 = indexed by web canvas — labels found
- *   5 = indexed by web canvas — no labels (don't retry)
+ *   1 = iOS native Vision only (legacy — no canvas colors; re-index to v2)
+ *   2 = iOS native Vision + canvas color extraction (current iOS target)
+ *   4 = web canvas — labels found
+ *   5 = web canvas — no labels (don't retry)
  *
- * On web: process any item whose visionVersion is 0 (or undefined).
- * Re-process items with visionVersion 1–3 to pick up the web canvas results.
- * Do NOT re-process items at version 4 or 5.
+ * needsIndexing:
+ *   iOS:  v === 0 or v === 1  (v1 items get re-indexed to pick up canvas colors)
+ *   web:  v < 4
  */
 
 import { listClothing, updateVisionData } from "./localDB";
@@ -18,7 +19,6 @@ import { extractColorsFromDataUrl } from "./visionWeb";
 const DELAY_MS = 350;
 
 // ── Native iOS Vision bridge ──────────────────────────────────────────────────
-// Dynamically registered so the web build doesn't error when Capacitor is absent.
 
 interface NativeVisionResult {
   labels: string[];
@@ -48,6 +48,34 @@ function isCapacitorIOS(): boolean {
   }
 }
 
+/**
+ * Analyze one item on iOS: run native Vision + canvas color extraction in
+ * parallel, then merge the results.  Native Vision gives object/scene labels;
+ * canvas gives color names that Apple Vision never outputs.
+ */
+async function analyzeIOSItem(
+  imageObjectPath: string,
+): Promise<{ labels: string[]; text: string[]; version: number }> {
+  const [nativeResult, canvasColors] = await Promise.all([
+    analyzeWithNativeVision(imageObjectPath),
+    extractColorsFromDataUrl(imageObjectPath),
+  ]);
+
+  const nativeLabels = nativeResult?.labels ?? [];
+  const nativeText   = nativeResult?.text   ?? [];
+
+  // Merge: canvas colors first (most search-useful), then native object labels.
+  // De-duplicate in case Vision ever returns a color word.
+  const seen = new Set<string>();
+  const mergedLabels: string[] = [];
+  for (const l of [...canvasColors, ...nativeLabels]) {
+    if (!seen.has(l)) { seen.add(l); mergedLabels.push(l); }
+  }
+
+  const hasData = mergedLabels.length > 0 || nativeText.length > 0;
+  return { labels: mergedLabels, text: nativeText, version: hasData ? 2 : 5 };
+}
+
 // ── Pending queue for newly added items ───────────────────────────────────────
 
 const pendingQueue = new Set<number>();
@@ -62,8 +90,8 @@ export function queueItemForIndexing(itemId: number): void {
 export const INDEXER_EVENT = "visionIndexer:progress";
 
 interface IndexerProgress {
-  done:  number;
-  total: number;
+  done:     number;
+  total:    number;
   finished: boolean;
 }
 
@@ -87,13 +115,13 @@ export async function startVisionIndexer(): Promise<void> {
     const allItems = await listClothing();
     const onIOS    = isCapacitorIOS();
 
-    // Items needing analysis:
-    //   web:    visionVersion < 4 (includes 0,1,2,3)
-    //   iOS:    visionVersion === 0 only (native handles everything)
+    // needsIndexing:
+    //   iOS: v === 0 (never analyzed) OR v === 1 (legacy native-only, missing colors)
+    //   web: v < 4
     const toIndex = allItems.filter((item) => {
       if (!item.imageObjectPath) return false;
       const v = item.visionVersion ?? 0;
-      return onIOS ? v === 0 : v < 4;
+      return onIOS ? (v === 0 || v === 1) : v < 4;
     });
 
     if (toIndex.length === 0) {
@@ -109,14 +137,9 @@ export async function startVisionIndexer(): Promise<void> {
 
       try {
         if (onIOS) {
-          // Native Vision: labels + OCR text
-          const result = await analyzeWithNativeVision(item.imageObjectPath!);
-          if (result) {
-            const version = result.labels.length > 0 || result.text.length > 0 ? 1 : 5;
-            await updateVisionData(item.id, result.labels, result.text, version);
-          }
+          const { labels, text, version } = await analyzeIOSItem(item.imageObjectPath!);
+          await updateVisionData(item.id, labels, text, version);
         } else {
-          // Web canvas: color extraction only
           const labels = await extractColorsFromDataUrl(item.imageObjectPath!);
           await updateVisionData(item.id, labels, [], labels.length > 0 ? 4 : 5);
         }
@@ -143,8 +166,14 @@ export async function startVisionIndexer(): Promise<void> {
         const { getClothingItem } = await import("./localDB");
         const item = await getClothingItem(id);
         if (!item?.imageObjectPath) continue;
-        const labels = await extractColorsFromDataUrl(item.imageObjectPath);
-        await updateVisionData(id, labels, [], labels.length > 0 ? 4 : 5);
+
+        if (isCapacitorIOS()) {
+          const { labels, text, version } = await analyzeIOSItem(item.imageObjectPath);
+          await updateVisionData(id, labels, text, version);
+        } else {
+          const labels = await extractColorsFromDataUrl(item.imageObjectPath);
+          await updateVisionData(id, labels, [], labels.length > 0 ? 4 : 5);
+        }
       } catch {
         // ignore
       }
@@ -159,12 +188,10 @@ export function indexItemNow(itemId: number): void {
       const { getClothingItem } = await import("./localDB");
       const item = await getClothingItem(itemId);
       if (!item?.imageObjectPath) return;
+
       if (isCapacitorIOS()) {
-        const result = await analyzeWithNativeVision(item.imageObjectPath);
-        if (result) {
-          const v = result.labels.length > 0 || result.text.length > 0 ? 1 : 5;
-          await updateVisionData(itemId, result.labels, result.text, v);
-        }
+        const { labels, text, version } = await analyzeIOSItem(item.imageObjectPath);
+        await updateVisionData(itemId, labels, text, version);
       } else {
         const labels = await extractColorsFromDataUrl(item.imageObjectPath);
         await updateVisionData(itemId, labels, [], labels.length > 0 ? 4 : 5);

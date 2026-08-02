@@ -1,6 +1,10 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { Shirt, Sparkles, Bookmark, Settings } from "lucide-react";
+import { Shirt, Sparkles, Settings } from "lucide-react";
+
+function SuitcaseEmoji({ className }: { className?: string; strokeWidth?: number }) {
+  return <span className={className} style={{ fontSize: "1.35em", lineHeight: 1 }}>🧳</span>;
+}
 import { cn } from "@/lib/utils";
 import { useGetWardrobeStats } from "@/hooks/useLocalDB";
 
@@ -23,7 +27,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const navItems = [
     { href: "/",         label: "Suitcase", icon: Shirt,    badge: wardrobeCount },
     { href: "/generate", label: "Generate", icon: Sparkles  },
-    { href: "/saved",    label: "Saved",    icon: Bookmark  },
+    { href: "/saved",    label: "Saved",    icon: SuitcaseEmoji },
     { href: "/account",  label: "Settings", icon: Settings  },
   ];
 

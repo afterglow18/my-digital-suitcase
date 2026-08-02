@@ -3,15 +3,15 @@
  *
  * Props:
  *   showAddToLookbook (default false)
- *     true  → image-area action buttons: [Wearing Today] + [Add to Lookbook]
- *     false → image-area action buttons: [Wearing Today] + [Clean Up Photo ✨]
+ *     true  → shows [Add to Lookbook] button below the photo
+ *     false → shows [Clean Up Photo ✨] button below the photo (if not already cleaned)
  *
  * The footer always contains Save Changes (when dirty) and Delete.
  */
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  X, Heart, Trash2, Save, ChevronDown, Sparkles, BookMarked, Shirt,
+  X, Heart, Trash2, Save, ChevronDown, Sparkles, BookMarked,
 } from "lucide-react";
 import { BgRemovalSheet } from "./BgRemovalSheet";
 import { AddToLookbookSheet } from "./AddToLookbookSheet";
@@ -168,8 +168,6 @@ export function ItemDetailsSheet({
   const [showLookbookPicker, setShowLookbookPicker] = useState(false);
   const [displayImagePath,  setDisplayImagePath]  = useState<string | null>(null);
   const [localBgRemoved, setLocalBgRemoved] = useState(false);
-  const [wearingLogged, setWearingLogged]   = useState(false);
-
   const updateItem  = useUpdateClothingItem();
   const deleteItem  = useDeleteClothingItem();
   const queryClient = useQueryClient();
@@ -183,7 +181,6 @@ export function ItemDetailsSheet({
     setShowDeleteConfirm(false);
     setShowBgRemoval(false);
     setShowLookbookPicker(false);
-    setWearingLogged(false);
   }, [item?.id]);
 
   if (!item || !form) return null;
@@ -235,23 +232,6 @@ export function ItemDetailsSheet({
         },
       }
     );
-  };
-
-  const handleWearingToday = () => {
-    if (wearingLogged) return;
-    setWearingLogged(true);
-    updateItem.mutate(
-      { id: item.id, data: { timesWorn: (item.timesWorn ?? 0) + 1 } },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListClothingQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getListOutfitsQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getWardrobeStatsQueryKey() });
-        },
-      },
-    );
-    // Reset the "logged" feedback after 2 s
-    setTimeout(() => setWearingLogged(false), 2000);
   };
 
   return (
@@ -328,27 +308,12 @@ export function ItemDetailsSheet({
             />
           </div>
 
-          {/* Action buttons below photo — always 2 */}
-          <div className="px-4 py-3 bg-white border-t border-black/10 grid grid-cols-2 gap-2">
-            {/* Button 1 — always: Wearing Today */}
-            <button
-              onClick={handleWearingToday}
-              disabled={wearingLogged}
-              className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl
-                          border-2 border-black font-display font-bold text-xs uppercase
-                          shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]
-                          active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all
-                          ${wearingLogged ? "bg-green-100 border-green-600 text-green-700" : "bg-white"}`}
-            >
-              <Shirt className="w-3.5 h-3.5" />
-              {wearingLogged ? "Logged ✓" : "Wearing Today"}
-            </button>
-
-            {/* Button 2 — context-aware */}
+          {/* Action button below photo */}
+          <div className="px-4 py-3 bg-white border-t border-black/10">
             {showAddToLookbook ? (
               <button
                 onClick={() => setShowLookbookPicker(true)}
-                className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl
                            border-2 border-black bg-white font-display font-bold text-xs uppercase
                            shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]
                            active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
@@ -360,7 +325,7 @@ export function ItemDetailsSheet({
               !(localBgRemoved || item.bgRemoved) && (
                 <button
                   onClick={() => setShowBgRemoval(true)}
-                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl
                              border-2 border-black bg-white font-display font-bold text-xs uppercase
                              shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]
                              active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
@@ -374,33 +339,19 @@ export function ItemDetailsSheet({
         </div>
       )}
 
-      {/* No image — still show action buttons */}
-      {!item.imageObjectPath && (
-        <div className="px-4 py-3 bg-white border-b-2 border-black grid grid-cols-2 gap-2">
+      {/* No image — still show Add to Lookbook if applicable */}
+      {!item.imageObjectPath && showAddToLookbook && (
+        <div className="px-4 py-3 bg-white border-b-2 border-black">
           <button
-            onClick={handleWearingToday}
-            disabled={wearingLogged}
-            className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl
-                        border-2 border-black font-display font-bold text-xs uppercase
-                        shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]
-                        active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all
-                        ${wearingLogged ? "bg-green-100 border-green-600 text-green-700" : "bg-white"}`}
+            onClick={() => setShowLookbookPicker(true)}
+            className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl
+                       border-2 border-black bg-white font-display font-bold text-xs uppercase
+                       shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]
+                       active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
           >
-            <Shirt className="w-3.5 h-3.5" />
-            {wearingLogged ? "Logged ✓" : "Wearing Today"}
+            <BookMarked className="w-3.5 h-3.5" />
+            Add to Lookbook
           </button>
-          {showAddToLookbook && (
-            <button
-              onClick={() => setShowLookbookPicker(true)}
-              className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl
-                         border-2 border-black bg-white font-display font-bold text-xs uppercase
-                         shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]
-                         active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
-            >
-              <BookMarked className="w-3.5 h-3.5" />
-              Add to Lookbook
-            </button>
-          )}
         </div>
       )}
 
@@ -439,20 +390,12 @@ export function ItemDetailsSheet({
                        placeholder:font-normal placeholder:text-black/25"
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <SelectField
-            label="Category"
-            value={form.category}
-            onChange={patch("category") as (v: string) => void}
-            options={CATEGORY_OPTIONS}
-          />
-          <div className="flex flex-col gap-1 opacity-50 pointer-events-none">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-black/40">Times Worn</span>
-            <div className="border-2 border-black/20 rounded-lg px-3 py-2 text-sm font-medium bg-white/50">
-              {item.timesWorn ?? 0}
-            </div>
-          </div>
-        </div>
+        <SelectField
+          label="Category"
+          value={form.category}
+          onChange={patch("category") as (v: string) => void}
+          options={CATEGORY_OPTIONS}
+        />
       </div>
 
       {/* ── Footer actions ── */}
