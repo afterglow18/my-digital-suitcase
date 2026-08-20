@@ -55,6 +55,49 @@ workflows:
           npx cap add ios
           npx cap sync ios
 
+      - name: Configure iPhone-only target
+        script: |
+          PBXPROJ="artifacts/outfit-generator/ios/App/App.xcodeproj/project.pbxproj"
+          python3 - "$PBXPROJ" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          project = path.read_text()
+
+          # Capacitor generates a universal iOS target by default. Restrict
+          # the generated app to iPhone so App Store Connect does not list it
+          # as compatible with iPad.
+          project, replaced = re.subn(
+              r"(^\s*TARGETED_DEVICE_FAMILY\s*=\s*)[^;]+(;)",
+              r"\g<1>1\2",
+              project,
+              flags=re.MULTILINE,
+          )
+
+          if replaced == 0:
+              # Keep this resilient across Capacitor/Xcode template changes.
+              # Add the setting to each app-target build configuration.
+              lines = project.splitlines(keepends=True)
+              patched = []
+              added = 0
+              for line in lines:
+                  patched.append(line)
+                  if "PRODUCT_BUNDLE_IDENTIFIER =" in line:
+                      indent = re.match(r"^\s*", line).group(0)
+                      patched.append(f"{indent}TARGETED_DEVICE_FAMILY = 1;\n")
+                      added += 1
+              if added == 0:
+                  raise SystemExit("Could not find an app-target build configuration")
+              project = "".join(patched)
+
+          path.write_text(project)
+          print(f"Configured TARGETED_DEVICE_FAMILY = 1 ({replaced or added} block(s))")
+          PY
+
+          grep -n "TARGETED_DEVICE_FAMILY" "$PBXPROJ"
+
       - name: Inject app icon
         script: |
           ICONSET="artifacts/outfit-generator/ios/App/App/Assets.xcassets/AppIcon.appiconset"
@@ -144,6 +187,7 @@ workflows:
             -configuration Release \
             ONLY_ACTIVE_ARCH=NO \
             ARCHS=arm64 \
+            TARGETED_DEVICE_FAMILY=1 \
             DEVELOPMENT_TEAM=2A78MFVCJS \
             CODE_SIGN_STYLE=Manual \
             PROVISIONING_PROFILE_SPECIFIER="My Digital Suitcase AppStore" \
